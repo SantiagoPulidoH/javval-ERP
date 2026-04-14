@@ -67,11 +67,8 @@
             await batch.commit();
           }
         },
-        // Get all doc IDs + selected fields (lightweight for delete operations)
-        getAllIds: async (name) => {
-          const snap = await getDocs(collection(db, name));
-          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        },
+        // getAllIds: merged into getAll above
+
         update: async (name, id, data) => {
           await updateDoc(doc(db, name, id), { ...data, _ts: serverTimestamp() });
         },
@@ -79,19 +76,24 @@
           await deleteDoc(doc(db, name, id));
         },
         // Real-time listener — calls cb(array) every time collection changes
-        listen: (name, cb, ord = '_ts') => {
-          const q = query(collection(db, name), orderBy(ord, 'desc'));
-          return onSnapshot(q, snap => {
+        listen: (name, cb) => {
+          // No orderBy — avoids Firestore index requirements
+          return onSnapshot(collection(db, name), snap => {
             cb(snap.docs.map(d => ({ ...d.data(), _fbId: d.id })));
           }, err => {
             console.warn('Firestore listener error:', err);
           });
         },
         // One-time fetch
-        getAll: async (name, ord = '_ts') => {
-          const q = query(collection(db, name), orderBy(ord, 'desc'));
-          const snap = await getDocs(q);
+        // No orderBy — avoids index requirements on fresh Firestore databases
+        // Sorting is done in JS after fetching
+        getAll: async (name) => {
+          const snap = await getDocs(collection(db, name));
           return snap.docs.map(d => ({ ...d.data(), _fbId: d.id }));
+        },
+        getAllIds: async (name) => {
+          const snap = await getDocs(collection(db, name));
+          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
         }
       };
 
@@ -3887,6 +3889,12 @@
       function applyDocs(key, docs, renderFn) {
         if (!docs.length) return;
         if (key === 'ventas' && window._ventasListenerPaused) return;
+        // Sort by _ts desc (newest first) since we removed orderBy from listener
+        docs.sort((a, b) => {
+          const ta = a._ts?.seconds || 0;
+          const tb = b._ts?.seconds || 0;
+          return tb - ta;
+        });
         state[key] = docs;
         saveLocal();
         try { renderFn?.(); } catch (e) {}
@@ -3905,6 +3913,12 @@
 
       window.FS.getAll('ventas').then(docs => {
         if (docs.length > 0) {
+          // Sort newest first by fecha+remision
+          docs.sort((a, b) => {
+            const fd = (b.fecha||'').localeCompare(a.fecha||'');
+            if (fd !== 0) return fd;
+            return (b.remision||0) - (a.remision||0);
+          });
           state.ventas = docs;
           saveLocal();
           renderVentas();
