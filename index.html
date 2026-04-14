@@ -12,13 +12,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc,
-      doc, query, orderBy, onSnapshot, serverTimestamp, setDoc, writeBatch
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script>
     const firebaseConfig = {
       apiKey: "AIzaSyC_GgUvhTxwsrqjyWileKwj_D8uCWCgjwk",
       authDomain: "javval-operativo.firebaseapp.com",
@@ -30,71 +26,74 @@
     };
 
     try {
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
 
-      // ── Expose helpers to global scope ──────────────────────────────
+      // ── Expose helpers to global scope ─────────────────────────────
       window.FS = {
         db,
-        col: (name) => collection(db, name),
-        docRef: (name, id) => doc(db, name, id),
-        add: async (name, data) => {
-          const ref = await addDoc(collection(db, name), { ...data, _ts: serverTimestamp() });
-          return ref.id;
-        },
-        set: async (name, id, data) => {
-          await setDoc(doc(db, name, id), { ...data, _ts: serverTimestamp() });
-        },
-        // Bulk write using Firestore batched commits (max 499 per batch)
-        batchSet: async (name, docsMap) => {
-          const LIMIT = 499;
-          for (let i = 0; i < docsMap.length; i += LIMIT) {
-            const batch = writeBatch(db);
-            docsMap.slice(i, i + LIMIT).forEach(({ id, data }) => {
-              batch.set(doc(db, name, id), { ...data, _ts: serverTimestamp() });
-            });
-            await batch.commit();
-          }
-        },
-        // Bulk delete using Firestore batched commits (max 499 per batch)
-        batchDelete: async (name, ids) => {
-          const LIMIT = 499;
-          for (let i = 0; i < ids.length; i += LIMIT) {
-            const batch = writeBatch(db);
-            ids.slice(i, i + LIMIT).forEach(id => {
-              batch.delete(doc(db, name, id));
-            });
-            await batch.commit();
-          }
-        },
-        // getAllIds: merged into getAll above
 
-        update: async (name, id, data) => {
-          await updateDoc(doc(db, name, id), { ...data, _ts: serverTimestamp() });
+        // Write/update a record — db.ref(path).set(data)
+        set: async (colName, id, data) => {
+          await db.ref('javval/' + colName + '/' + id).set({ ...data, _ts: Date.now() });
         },
-        del: async (name, id) => {
-          await deleteDoc(doc(db, name, id));
+
+        // Add with auto-ID
+        add: async (colName, data) => {
+          const ref = db.ref('javval/' + colName).push();
+          await ref.set({ ...data, _ts: Date.now() });
+          return ref.key;
         },
-        // Real-time listener — calls cb(array) every time collection changes
-        listen: (name, cb) => {
-          // No orderBy — avoids Firestore index requirements
-          return onSnapshot(collection(db, name), snap => {
-            cb(snap.docs.map(d => ({ ...d.data(), _fbId: d.id })));
+
+        // Delete
+        del: async (colName, id) => {
+          await db.ref('javval/' + colName + '/' + id).remove();
+        },
+
+        // Get all as array
+        getAll: async (colName) => {
+          const snap = await db.ref('javval/' + colName).get();
+          if (!snap.exists()) return [];
+          const val = snap.val();
+          return Object.entries(val).map(([id, data]) => ({ ...data, _fbId: id }));
+        },
+
+        // Get all IDs + data (for delete operations)
+        getAllIds: async (colName) => {
+          const snap = await db.ref('javval/' + colName).get();
+          if (!snap.exists()) return [];
+          const val = snap.val();
+          return Object.entries(val).map(([id, data]) => ({ ...data, id, _fbId: id }));
+        },
+
+        // Real-time listener — calls cb(array) every time data changes
+        listen: (colName, cb) => {
+          db.ref('javval/' + colName).on('value', snap => {
+            if (!snap.exists()) { cb([]); return; }
+            const val = snap.val();
+            const arr = Object.entries(val).map(([id, data]) => ({ ...data, _fbId: id }));
+            cb(arr);
           }, err => {
-            console.warn('Firestore listener error:', err);
+            console.warn('DB listener error:', colName, err);
           });
         },
-        // One-time fetch
-        // No orderBy — avoids index requirements on fresh Firestore databases
-        // Sorting is done in JS after fetching
-        getAll: async (name) => {
-          const snap = await getDocs(collection(db, name));
-          return snap.docs.map(d => ({ ...d.data(), _fbId: d.id }));
+
+        // Batch set — Realtime DB handles multiple sets efficiently
+        batchSet: async (colName, docsMap) => {
+          // Use multi-path update for atomicity
+          const updates = {};
+          docsMap.forEach(({ id, data }) => {
+            updates['javval/' + colName + '/' + id] = { ...data, _ts: Date.now() };
+          });
+          await db.ref().update(updates);
         },
-        getAllIds: async (name) => {
-          const snap = await getDocs(collection(db, name));
-          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        }
+
+        // Batch delete
+        batchDelete: async (colName, ids) => {
+          const updates = {};
+          ids.forEach(id => { updates['javval/' + colName + '/' + id] = null; });
+          await db.ref().update(updates);
+        },
       };
 
       window.firebaseReady = true;
@@ -104,14 +103,14 @@
       const _topFbEl = document.getElementById('topbar-fb-status');
       if (_topFbEl) { _topFbEl.textContent = _fbMsg; _topFbEl.style.color = '#22c55e'; }
 
-      // Signal that Firebase is ready so the main script can start listeners
       document.dispatchEvent(new Event('firebase-ready'));
 
     } catch (e) {
       console.error('Firebase init error:', e);
-      window.firebaseReady = false;
-      document.getElementById('firebase-status').textContent = '🟡 Modo local (sin Firebase)';
-      document.getElementById('firebase-status').style.color = '#f5a623';
+      const _fbErrEl = document.getElementById('firebase-status');
+      if (_fbErrEl) _fbErrEl.textContent = '🔴 Firebase desconectado';
+      const _topErrEl = document.getElementById('topbar-fb-status');
+      if (_topErrEl) _topErrEl.textContent = '🔴 Firebase desconectado';
       document.dispatchEvent(new Event('firebase-ready'));
     }
   </script>
@@ -3826,6 +3825,19 @@
     function toFS(obj) {
       const c = { ...obj };
       delete c._fbId; delete c._ts;
+      // Realtime DB doesn't support undefined values - replace with null
+      Object.keys(c).forEach(k => {
+        if (c[k] === undefined) c[k] = null;
+        // Clean nested items array
+        if (Array.isArray(c[k])) {
+          c[k] = c[k].map(item => {
+            if (typeof item !== 'object' || !item) return item;
+            const clean = { ...item };
+            Object.keys(clean).forEach(ik => { if (clean[ik] === undefined) clean[ik] = null; });
+            return clean;
+          });
+        }
+      });
       return c;
     }
 
@@ -3875,13 +3887,10 @@
     function startFirestoreListeners() {
       if (!window.FS) return;
 
-      // Load stockMins config once
-      window.FS.getAll('config').then(docs => {
-        const cfg = docs.find(d => d._fbId === 'stockMins' || d.id === 'stockMins');
-        if (cfg) {
-          const mins = { ...cfg };
-          delete mins._fbId; delete mins._ts; delete mins.id;
-          state.stockMins = mins;
+      // Load stockMins config from Realtime DB
+      window.FS.db.ref('javval/config/stockMins').get().then(snap => {
+        if (snap.exists()) {
+          state.stockMins = snap.val() || {};
           saveStockMins();
         }
       }).catch(() => {});
@@ -3903,9 +3912,9 @@
       }
 
       // ── STARTUP LOAD: getAll() for ventas on first load ──────────────
-      // onSnapshot alone can take 3-5s for 2400+ docs on a cold start.
+      // Realtime DB .get() fetches all docs immediately.
       // getAll() fetches immediately and populates the list right away.
-      // onSnapshot then handles real-time updates (new/edited ventas).
+      // .on("value") listener then handles real-time updates automatically.
       const ventasBodyEl = document.getElementById('ventas-tbody');
       if (ventasBodyEl) ventasBodyEl.innerHTML =
         '<tr><td colspan="8"><div class="empty-state"><div class="icon">🔄</div>' +
@@ -5637,7 +5646,7 @@
       saveStockMins();
       // Sync to Firestore as a single doc
       if (window.FS) {
-        window.FS.set('config', 'stockMins', state.stockMins).catch(() => { });
+        window.FS.db.ref('javval/config/stockMins').set(state.stockMins).catch(() => {});
       }
       renderInventario();
     }
@@ -5755,7 +5764,7 @@
           renderInventario();
           renderMovimientos();
         }
-      }, '_ts');
+      });
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -7137,7 +7146,7 @@
     // ── Limpiar historial importado — consulta Firebase directamente ────
     // Usa getAllIds para traer TODOS los docs de ventas (no solo los 200 en cache)
     // Filtra los que son _fromHistorial o tienen ID que empieza con 'hist_'
-    // Borra con writeBatch + barra de progreso
+    // Borra con batchDelete + barra de progreso
     async function limpiarHistorialVentas() {
       const statusEl = document.getElementById('ventas-import-status');
       statusEl.style.display  = 'block';
