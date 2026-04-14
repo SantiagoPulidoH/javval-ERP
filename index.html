@@ -3856,7 +3856,8 @@
       if (!window.FS) return;
       try {
         if (record._fbId) {
-          await window.FS.update(colName, record._fbId, toFS(record));
+          // Realtime DB: set() handles both create and update
+          await window.FS.set(colName, record._fbId, toFS(record));
         } else {
           const newId = await window.FS.add(colName, toFS(record));
           record._fbId = newId;
@@ -3900,8 +3901,8 @@
         if (key === 'ventas' && window._ventasListenerPaused) return;
         // Sort by _ts desc (newest first) since we removed orderBy from listener
         docs.sort((a, b) => {
-          const ta = a._ts?.seconds || 0;
-          const tb = b._ts?.seconds || 0;
+          const ta = typeof a._ts === 'number' ? a._ts : 0;
+          const tb = typeof b._ts === 'number' ? b._ts : 0;
           return tb - ta;
         });
         state[key] = docs;
@@ -3937,9 +3938,9 @@
       }).catch(e => console.warn('getAll ventas:', e));
 
       // Real-time listener keeps in sync after initial load
-      window.FS.listen('ventas',  d => applyDocs('ventas',  d, renderVentas),  '_ts');
-      window.FS.listen('compras', d => applyDocs('compras', d, renderCompras), '_ts');
-      window.FS.listen('cobros',  d => applyDocs('cobros',  d, renderCobros),  '_ts');
+      window.FS.listen('ventas', d => applyDocs('ventas',  d, renderVentas));
+      window.FS.listen('compras', d => applyDocs('compras', d, renderCompras));
+      window.FS.listen('cobros', d => applyDocs('cobros',  d, renderCobros));
     }
 
     // Seed Firestore with master data on very first run
