@@ -5104,6 +5104,289 @@
     // ════════════════════════════════════════════
     // INIT
     // ════════════════════════════════════════════
+
+    // ════════════════════════════════════════════════════════════════════
+    // CUENTAS POR PAGAR (CXC Pagar)
+    // ════════════════════════════════════════════════════════════════════
+    function renderCXPagar(list = null) {
+      const items = list || state.cxpagar;
+      const vigentes = items.filter(x => x.seccion === 'vigente');
+      const antiguas = items.filter(x => x.seccion === 'antigua');
+      const tv = vigentes.reduce((s, x) => s + (parseFloat(x.saldo) || 0), 0);
+      const ta = antiguas.reduce((s, x) => s + (parseFloat(x.saldo) || 0), 0);
+      const total = tv + ta;
+      const acreedores = new Set(items.map(x => x.nombre)).size;
+
+      const el = id => document.getElementById(id);
+      if (el('cxp-total-vigente'))  el('cxp-total-vigente').textContent  = fmt(tv);
+      if (el('cxp-total-antigua'))  el('cxp-total-antigua').textContent  = fmt(ta);
+      if (el('cxp-total-general'))  el('cxp-total-general').textContent  = fmt(total);
+      if (el('cxp-n-acreedores'))   el('cxp-n-acreedores').textContent   = acreedores;
+
+      function rows(arr, tbodyId) {
+        const tbody = el(tbodyId);
+        if (!tbody) return;
+        if (!arr.length) {
+          tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">🏦</div><p>Sin registros</p></div></td></tr>';
+          return;
+        }
+        tbody.innerHTML = arr.map(x => `
+          <tr>
+            <td><strong>${x.nombre || '—'}</strong></td>
+            <td style="font-family:var(--mono);font-size:11px">${x.fechaCredito || '—'}</td>
+            <td style="font-family:var(--mono);font-size:11px">${x.noFactura || '—'}</td>
+            <td style="color:var(--red);font-family:var(--mono)">${fmt(x.saldo)}</td>
+            <td><span class="badge ${parseFloat(x.saldo) > 0 ? 'red' : 'green'}">${parseFloat(x.saldo) > 0 ? 'Pendiente' : 'Pagado'}</span></td>
+            <td style="display:flex;gap:4px">
+              <button class="btn sm secondary" onclick="openCXPModal('${x.seccion}','${x.id}')">Editar</button>
+              <button class="btn sm danger" onclick="deleteCXP('${x.id}')">✕</button>
+            </td>
+          </tr>`).join('');
+      }
+      rows(vigentes, 'cxp-vigente-tbody');
+      rows(antiguas, 'cxp-antigua-tbody');
+    }
+
+    function filterCXP(val) {
+      const v = val.toUpperCase();
+      renderCXPagar(state.cxpagar.filter(x => (x.nombre || '').toUpperCase().includes(v)));
+    }
+
+    function openCXPModal(tipo = 'vigente', id = null) {
+      document.getElementById('modal-cxp-title').textContent = id ? 'Editar CXP' : 'Nueva Cuenta por Pagar';
+      if (id) {
+        const x = state.cxpagar.find(c => c.id === id);
+        if (!x) return;
+        document.getElementById('cxp-nombre-input').value = x.nombre || '';
+        document.getElementById('cxp-fecha').value        = x.fechaCredito || '';
+        document.getElementById('cxp-factura').value      = x.noFactura || '';
+        document.getElementById('cxp-saldo').value        = x.saldo || '';
+        document.getElementById('cxp-seccion').value      = x.seccion || 'vigente';
+        document.getElementById('cxp-notas').value        = x.notas || '';
+        document.getElementById('cxp-id').value           = id;
+      } else {
+        ['cxp-nombre-input','cxp-fecha','cxp-factura','cxp-saldo','cxp-notas'].forEach(i => document.getElementById(i).value = '');
+        document.getElementById('cxp-seccion').value = tipo;
+        document.getElementById('cxp-id').value = '';
+      }
+      document.getElementById('modal-cxpagar').classList.add('open');
+    }
+
+    function saveCXP() {
+      const nombre = document.getElementById('cxp-nombre-input').value.trim().toUpperCase();
+      const saldo  = parseFloat(document.getElementById('cxp-saldo').value);
+      if (!nombre) { toast('Ingresa el nombre del proveedor', 'error'); return; }
+      if (!saldo)  { toast('Ingresa el saldo', 'error'); return; }
+      const existId = document.getElementById('cxp-id').value;
+      const rec = {
+        id: existId || genId(),
+        nombre,
+        fechaCredito: document.getElementById('cxp-fecha').value,
+        noFactura:    document.getElementById('cxp-factura').value,
+        saldo,
+        seccion:      document.getElementById('cxp-seccion').value,
+        notas:        document.getElementById('cxp-notas').value,
+        createdAt:    new Date().toISOString(),
+      };
+      if (existId) {
+        const idx = state.cxpagar.findIndex(c => c.id === existId);
+        if (idx >= 0) { rec._fbId = state.cxpagar[idx]._fbId; state.cxpagar[idx] = rec; }
+      } else {
+        state.cxpagar.unshift(rec);
+      }
+      saveFlujoLocal();
+      if (window.FS) fsSave('cuentas_pagar', rec);
+      closeModal('modal-cxpagar');
+      renderCXPagar();
+      renderDashboard();
+      toast('Cuenta guardada ✓', 'success');
+    }
+
+    function deleteCXP(id) {
+      if (!confirm('¿Eliminar esta cuenta?')) return;
+      const rec = state.cxpagar.find(c => c.id === id);
+      state.cxpagar = state.cxpagar.filter(c => c.id !== id);
+      saveFlujoLocal();
+      if (window.FS && rec?._fbId) window.FS.del('cuentas_pagar', rec._fbId);
+      renderCXPagar();
+      renderDashboard();
+      toast('Eliminado', 'info');
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // ENTREGAS Y COBROS CXC
+    // ════════════════════════════════════════════════════════════════════
+    function renderEntregas() {
+      const mes = currentEntregasMes;
+      const lbl = document.getElementById('entregas-mes-label');
+      if (lbl) lbl.textContent = mesLabel(mes);
+
+      const items = state.entregas.filter(e => (e.mes || e.fecha?.slice(0,7)) === mes);
+
+      // Update cuadre summary
+      const totalPend = items.reduce((s, e) => {
+        const cob = (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0);
+        return s + Math.max(0, (e.cxc || e.valor || 0) - cob);
+      }, 0);
+      const totalCob = items.reduce((s, e) => s + (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0), 0);
+      const totalVentas = items.reduce((s, e) => s + (e.valor || 0), 0);
+      const ingCajaNequi = state.flujo.filter(f => f.mes === mes).reduce((s, f) => s + (f.ingOp || 0), 0);
+
+      const el = id => document.getElementById(id);
+      if (el('cxc-total-pendiente')) el('cxc-total-pendiente').textContent = fmt(totalPend);
+      if (el('cxc-ing-planilla'))    el('cxc-ing-planilla').textContent    = fmt(totalCob);
+      if (el('cxc-ing-caja-nequi'))  el('cxc-ing-caja-nequi').textContent  = fmt(ingCajaNequi);
+      const diff = Math.abs(totalCob - ingCajaNequi);
+      const stEl = el('cxc-match-status');
+      if (stEl) {
+        stEl.textContent = diff < 1000 ? '✅ Cuadre OK' : `⚠ Diferencia: ${fmt(diff)}`;
+        stEl.style.color = diff < 1000 ? 'var(--green)' : 'var(--red)';
+      }
+
+      // Render table header days
+      const headerDays = el('entregas-header-days');
+      if (headerDays) {
+        const [y, m] = mes.split('-').map(Number);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        let html = '';
+        for (let d = 1; d <= daysInMonth; d++) html += `<th style="font-size:9px;text-align:center;min-width:24px">${d}</th>`;
+        headerDays.innerHTML = html;
+      }
+
+      const tbody = el('entregas-tbody');
+      if (!tbody) return;
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="40"><div class="empty-state"><div class="icon">📋</div><p>Sin registros este mes</p></div></td></tr>';
+        return;
+      }
+
+      const [y, m] = mes.split('-').map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      tbody.innerHTML = items.map(e => {
+        const cobros = e.cobros || [];
+        const cobMap = {};
+        cobros.forEach(c => { cobMap[c.dia] = (cobMap[c.dia] || 0) + c.valor; });
+        const totalCobE = cobros.reduce((s, c) => s + c.valor, 0);
+        const pendiente = Math.max(0, (e.cxc || e.valor || 0) - totalCobE);
+        const estado = pendiente <= 0 ? 'green' : totalCobE > 0 ? 'orange' : 'red';
+        let dayCells = '';
+        for (let d = 1; d <= daysInMonth; d++) {
+          dayCells += cobMap[d]
+            ? `<td style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--green);cursor:pointer" onclick="openCobroCXC('${e.id}',${d})">${fmtNum(cobMap[d])}</td>`
+            : `<td style="text-align:center;cursor:pointer;color:var(--text3)" onclick="openCobroCXC('${e.id}',${d})">·</td>`;
+        }
+        const dias = e.fecha ? Math.floor((Date.now() - new Date(e.fecha)) / 86400000) : '—';
+        return `<tr>
+          <td style="font-family:var(--mono);font-size:11px">${e.fecha||'—'}</td>
+          <td><strong>${e.cliente||'—'}</strong></td>
+          <td>#${e.remision||'—'}</td>
+          <td style="font-family:var(--mono)">${fmt(e.valor)}</td>
+          <td style="font-family:var(--mono)">${fmt(e.cxc||e.valor)}</td>
+          <td>${dias}</td>
+          ${dayCells}
+          <td><button class="btn sm danger" onclick="deleteEntrega('${e.id}')">✕</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function filterEntregas(val) {
+      const v = val.toUpperCase();
+      const items = state.entregas.filter(e =>
+        (e.cliente||'').toUpperCase().includes(v) || String(e.remision||'').includes(v)
+      );
+      // Re-render filtered (simplified)
+      renderEntregas();
+    }
+
+    function openEntregaModal(id = null) {
+      document.getElementById('modal-entrega-title').textContent = id ? 'Editar CXC' : 'Agregar CXC';
+      if (id) {
+        const e = state.entregas.find(x => x.id === id);
+        if (!e) return;
+        document.getElementById('ent-fecha').value  = e.fecha || '';
+        document.getElementById('ent-remision').value = e.remision || '';
+        document.getElementById('ent-cliente-input').value = e.cliente || '';
+        document.getElementById('ent-cliente-val').value   = e.cliente || '';
+        document.getElementById('ent-valor').value = e.valor || '';
+        document.getElementById('ent-cxc').value   = e.cxc || '';
+        document.getElementById('ent-id').value    = id;
+      } else {
+        ['ent-fecha','ent-remision','ent-cliente-input','ent-cliente-val','ent-valor','ent-cxc'].forEach(i => document.getElementById(i).value = '');
+        document.getElementById('ent-fecha').value = today();
+        document.getElementById('ent-id').value = '';
+      }
+      document.getElementById('modal-entrega').classList.add('open');
+    }
+
+    function saveEntrega() {
+      const fecha   = document.getElementById('ent-fecha').value;
+      const cliente = document.getElementById('ent-cliente-val').value || document.getElementById('ent-cliente-input').value;
+      const valor   = parseFloat(document.getElementById('ent-valor').value);
+      if (!fecha || !cliente || !valor) { toast('Fecha, cliente y valor son obligatorios', 'error'); return; }
+      const existId = document.getElementById('ent-id').value;
+      const rec = {
+        id:       existId || genId(),
+        fecha,    cliente,
+        remision: document.getElementById('ent-remision').value,
+        valor,
+        cxc:      parseFloat(document.getElementById('ent-cxc').value) || valor,
+        mes:      fecha.slice(0, 7),
+        cobros:   existId ? (state.entregas.find(e => e.id === existId)?.cobros || []) : [],
+        createdAt: new Date().toISOString(),
+      };
+      if (existId) {
+        const idx = state.entregas.findIndex(e => e.id === existId);
+        if (idx >= 0) { rec._fbId = state.entregas[idx]._fbId; state.entregas[idx] = rec; }
+      } else {
+        state.entregas.unshift(rec);
+      }
+      saveFlujoLocal();
+      if (window.FS) fsSave('entregas_cxc', rec);
+      closeModal('modal-entrega');
+      renderEntregas();
+      toast('CXC guardado ✓', 'success');
+    }
+
+    function deleteEntrega(id) {
+      if (!confirm('¿Eliminar este registro?')) return;
+      const rec = state.entregas.find(e => e.id === id);
+      state.entregas = state.entregas.filter(e => e.id !== id);
+      saveFlujoLocal();
+      if (window.FS && rec?._fbId) window.FS.del('entregas_cxc', rec._fbId);
+      renderEntregas();
+      toast('Eliminado', 'info');
+    }
+
+    function openCobroCXC(entId, dia) {
+      const e = state.entregas.find(x => x.id === entId);
+      if (!e) return;
+      const cobrado = (e.cobros || []).reduce((s, c) => s + c.valor, 0);
+      const pendiente = Math.max(0, (e.cxc || e.valor || 0) - cobrado);
+      const infoEl = document.getElementById('cobro-cxc-info');
+      if (infoEl) infoEl.textContent = `${e.cliente} — Rem. #${e.remision} — Pendiente: ${fmt(pendiente)}`;
+      document.getElementById('ccxc-dia').value    = dia;
+      document.getElementById('ccxc-valor').value  = '';
+      document.getElementById('ccxc-nota').value   = '';
+      document.getElementById('ccxc-ent-id').value = entId;
+      document.getElementById('modal-cobro-cxc').classList.add('open');
+    }
+
+    function saveCobroCXC() {
+      const entId = document.getElementById('ccxc-ent-id').value;
+      const dia   = parseInt(document.getElementById('ccxc-dia').value);
+      const valor = parseFloat(document.getElementById('ccxc-valor').value);
+      if (!dia || !valor) { toast('Día y valor son obligatorios', 'error'); return; }
+      const e = state.entregas.find(x => x.id === entId);
+      if (!e) return;
+      if (!e.cobros) e.cobros = [];
+      e.cobros.push({ dia, valor, medio: document.getElementById('ccxc-medio').value, nota: document.getElementById('ccxc-nota').value });
+      saveFlujoLocal();
+      if (window.FS) fsSave('entregas_cxc', e);
+      closeModal('modal-cobro-cxc');
+      renderEntregas();
+      toast(`Cobro día ${dia} registrado ✓`, 'success');
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // RUBROS MAESTRO — extraídos de los Excel operativos
     // ════════════════════════════════════════════════════════════════════
