@@ -3962,9 +3962,16 @@
     // UTILS
     // ════════════════════════════════════════════
     function fmt(n) {
-      return '$' + Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const num = Number(n || 0);
+      // Pesos colombianos: sin decimales para valores >= 1 (siempre pesos enteros)
+      const decimals = (Math.abs(num) < 1 && num !== 0) ? 2 : 0;
+      return '$' + num.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     }
-    function fmtNum(n) { return Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function fmtNum(n) {
+      const num = Number(n || 0);
+      const decimals = (Math.abs(num) < 1 && num !== 0) ? 2 : 0;
+      return num.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
     function today() { return new Date().toISOString().split('T')[0]; }
     function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
     function toast(msg, type = 'info') {
@@ -6439,21 +6446,34 @@
       const precio= parseFloat(document.getElementById(`fci-precio-${rowIdx}`)?.value) || 0;
       const sub   = cant * precio;
       const subEl = document.getElementById(`fci-sub-${rowIdx}`);
-      if (subEl) subEl.textContent = fmt(sub);
+      if (subEl) {
+        subEl.textContent = fmt(sub);
+        subEl.dataset.raw = sub; // store raw number to avoid parsing formatted text
+      }
       calcFCTotal();
     }
 
     function calcFCTotal() {
       let total = 0;
       document.querySelectorAll('[id^="fci-sub-"]').forEach(el => {
-        total += parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        // Use data-raw if available (set by calcFCItem), else parse formatted text
+        total += parseFloat(el.dataset.raw) || parseFloat(el.textContent.replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
       });
       const totalEl = document.getElementById('fl-compra-total');
       if (totalEl) totalEl.textContent = fmt(total);
+      // Update fl-valor silently (no oninput trigger) to avoid infinite loop
+      // calcFCItem → calcFCTotal → onFlujoValorChange → calcFCTotal → ∞
       const valInput = document.getElementById('fl-valor');
       if (valInput && !valInput.disabled && total > 0) {
         valInput.value = Math.round(total);
-        onFlujoValorChange();
+        // Update impact display directly without calling onFlujoValorChange()
+        const impEl  = document.getElementById('fl-impacto');
+        const impCol = document.getElementById('fl-impacto-col');
+        if (impEl) {
+          impEl.textContent = '-' + fmt(total);
+          impEl.style.color = 'var(--red)';
+        }
+        if (impCol) impCol.textContent = 'Compras';
       }
     }
 
