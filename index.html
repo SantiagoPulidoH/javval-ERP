@@ -4227,14 +4227,17 @@
       const prec = parseFloat(document.getElementById(`${pre}-precio-${rowIdx}`)?.value) || 0;
       const sub = cant * prec;
       const subEl = document.getElementById(`${pre}-sub-${rowIdx}`);
-      if (subEl) subEl.textContent = fmt(sub);
+      if (subEl) {
+        subEl.textContent = fmt(sub);
+        subEl.dataset.raw = sub; // store raw value to avoid parsing COP-formatted text
+      }
       if (mode === 'v') calcVentaTotal(); else calcCompraTotal();
     }
 
     function calcVentaTotal() {
       let sub = 0;
       document.querySelectorAll('[id^="vi-sub-"]').forEach(el => {
-        sub += parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        sub += parseFloat(el.dataset.raw) || parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
       });
       document.getElementById('v-subtotal').textContent = fmt(sub);
       const desc = parseFloat(document.getElementById('v-descuento').value) || 0;
@@ -4245,7 +4248,7 @@
     function calcCompraTotal() {
       let total = 0;
       document.querySelectorAll('[id^="ci-sub-"]').forEach(el => {
-        total += parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        total += parseFloat(el.dataset.raw) || parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
       });
       document.getElementById('c-total').textContent = fmt(total);
     }
@@ -4263,7 +4266,7 @@
     <input id="vi-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
     <input id="vi-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant || ''}" oninput="calcItemTotal(${i},'v')">
     <input id="vi-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio || ''}" oninput="calcItemTotal(${i},'v')">
-    <span id="vi-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0.00'}</span>
+    <span id="vi-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px" data-raw="${data.cant && data.precio ? data.cant * data.precio : 0}">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0'}</span>
     <button class="item-del" onclick="removeRow('vi-row-${i}','v')">×</button>`;
       return div;
     }
@@ -4281,7 +4284,7 @@
     <input id="ci-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
     <input id="ci-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant || ''}" oninput="calcItemTotal(${i},'c')">
     <input id="ci-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio || ''}" oninput="calcItemTotal(${i},'c')">
-    <span id="ci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0.00'}</span>
+    <span id="ci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px" data-raw="${data.cant && data.precio ? data.cant * data.precio : 0}">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0'}</span>
     <button class="item-del" onclick="removeRow('ci-row-${i}','c')">×</button>`;
       return div;
     }
@@ -6430,7 +6433,7 @@
         <input id="fci-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad||''}" readonly>
         <input id="fci-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant||''}" oninput="calcFCItem(${i})">
         <input id="fci-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio||''}" oninput="calcFCItem(${i})">
-        <span id="fci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px">${data.cant && data.precio ? fmt(data.cant*data.precio) : '$0.00'}</span>
+        <span id="fci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px" data-raw="${data.cant && data.precio ? data.cant*data.precio : 0}">${data.cant && data.precio ? fmt(data.cant*data.precio) : '$0'}</span>
         <button class="item-del" onclick="removeFCIRow('fci-row-${i}')">×</button>`;
       container.appendChild(div);
       if (data.cant && data.precio) calcFCTotal();
