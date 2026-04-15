@@ -6586,26 +6586,66 @@
       toast(`✓ Día ${dia} — ${rubro}: ${fmt(val)}`, 'success');
     }
 
-    // Auto-fill valor from product total (called from calcFCTotal)
-    const _origCalcFCTotal = calcFCTotal;
-    calcFCTotal = function () {
-      _origCalcFCTotal();
-      // Sync to valor field
+    // ── Flujo de Caja: compra item rows ─────────────────────────────────
+    
+
+    function addFlujoCompraItem(data = {}) {
+      const i = flujoItemCounter++;
+      const container = document.getElementById('fl-compra-items');
+      if (!container) return;
+      const div = document.createElement('div');
+      div.id = `fci-row-${i}`;
+      div.style.cssText = 'display:grid;grid-template-columns:2.5fr 1fr 1fr 1fr 90px 30px;gap:6px;padding:8px 12px;border-bottom:1px solid rgba(42,42,56,.3);align-items:start';
+      div.innerHTML = `
+        <div class="autocomplete-wrap">
+          <input id="fci-nombre-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Buscar producto..."
+            value="${data.nombre||''}"
+            oninput="prodAcFilter(this,'fci-list-${i}',${i},'fc')"
+            onfocus="prodAcFilter(this,'fci-list-${i}',${i},'fc')"
+            onblur="setTimeout(()=>closeAc('fci-list-${i}'),180)" autocomplete="off">
+          <div class="autocomplete-list" id="fci-list-${i}"></div>
+        </div>
+        <input id="fci-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad||''}" readonly>
+        <input id="fci-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant||''}" oninput="calcFCItem(${i})">
+        <input id="fci-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio||''}" oninput="calcFCItem(${i})">
+        <span id="fci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px">${data.cant && data.precio ? fmt(data.cant*data.precio) : '$0.00'}</span>
+        <button class="item-del" onclick="removeFCIRow('fci-row-${i}')">×</button>`;
+      container.appendChild(div);
+      if (data.cant && data.precio) calcFCTotal();
+    }
+
+    function removeFCIRow(rowId) {
+      document.getElementById(rowId)?.remove();
+      calcFCTotal();
+    }
+
+    function calcFCItem(rowIdx) {
+      const cant  = parseFloat(document.getElementById(`fci-cant-${rowIdx}`)?.value)   || 0;
+      const precio= parseFloat(document.getElementById(`fci-precio-${rowIdx}`)?.value) || 0;
+      const sub   = cant * precio;
+      const subEl = document.getElementById(`fci-sub-${rowIdx}`);
+      if (subEl) subEl.textContent = fmt(sub);
+      calcFCTotal();
+    }
+
+    function calcFCTotal() {
       let total = 0;
       document.querySelectorAll('[id^="fci-sub-"]').forEach(el => {
         total += parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
       });
+      const totalEl = document.getElementById('fl-compra-total');
+      if (totalEl) totalEl.textContent = fmt(total);
       const valInput = document.getElementById('fl-valor');
       if (valInput && !valInput.disabled && total > 0) {
         valInput.value = Math.round(total);
         onFlujoValorChange();
       }
-    };
+    }
 
     // ════════════════════════════════════════════════════════════════════
     // SETUP PAGE — Rubros management
     // ════════════════════════════════════════════════════════════════════
-    let _rubroFilter = '';
+    var _rubroFilter = '';
 
     function renderSetup() {
       renderRubrosGrid(_rubroFilter);
