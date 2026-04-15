@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
-
+  
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -97,21 +97,12 @@
       };
 
       window.firebaseReady = true;
-      const _fbMsg = '🟢 Firebase conectado — sync en vivo';
-      const _fbEl = document.getElementById('firebase-status');
-      if (_fbEl) { _fbEl.textContent = _fbMsg; _fbEl.style.color = '#22c55e'; }
-      const _topFbEl = document.getElementById('topbar-fb-status');
-      if (_topFbEl) { _topFbEl.textContent = _fbMsg; _topFbEl.style.color = '#22c55e'; }
-
-      document.dispatchEvent(new Event('firebase-ready'));
+      // Status update happens from init() since DOM doesn't exist here (script in <head>)
 
     } catch (e) {
       console.error('Firebase init error:', e);
-      const _fbErrEl = document.getElementById('firebase-status');
-      if (_fbErrEl) _fbErrEl.textContent = '🔴 Firebase desconectado';
-      const _topErrEl = document.getElementById('topbar-fb-status');
-      if (_topErrEl) _topErrEl.textContent = '🔴 Firebase desconectado';
-      document.dispatchEvent(new Event('firebase-ready'));
+      window.firebaseReady = false;
+      // Status update on error happens from init() setTimeout
     }
   </script>
 
@@ -3939,7 +3930,7 @@
 
       // Real-time listener keeps in sync after initial load
       window.FS.listen('ventas', d => applyDocs('ventas',  d, renderVentas));
-      window.FS.listen('compras', d => applyDocs('compras', d, renderCompras));
+      window.FS.listen('compras', d => applyDocs('compras', d, null)); // renderCompras not implemented yet
       window.FS.listen('cobros', d => applyDocs('cobros',  d, renderCobros));
     }
 
@@ -5463,15 +5454,27 @@
       const _entLbl = document.getElementById('entregas-mes-label');
       if (_entLbl) _entLbl.textContent = mesLabel(currentEntregasMes);
 
-      // 2) Once the Firebase module finishes loading, hook up real-time sync
-      document.addEventListener('firebase-ready', async () => {
+      // 2) Firebase compat SDK carga sincrónicamente en <head> — window.FS
+      // ya está listo cuando init() corre. Usar setTimeout(0) para dejar
+      // que el UI renderice primero, luego arrancar sincronización Firebase.
+      setTimeout(async () => {
         if (window.FS) {
-          await seedFirestoreIfEmpty();  // upload master data on very first run
-          startFirestoreListeners();     // subscribe to real-time collection updates
-          listenAjustes();               // subscribe to inventory adjustments
-          startFlujoListeners();         // subscribe to flujo de caja, entregas, cxpagar
+          // Actualizar indicadores de estado (DOM ya existe aquí)
+          const _st = document.getElementById('firebase-status');
+          const _tt = document.getElementById('topbar-fb-status');
+          const _msg = '🟢 Firebase conectado — sync en vivo';
+          if (_st) { _st.textContent = _msg; _st.style.color = '#22c55e'; }
+          if (_tt) { _tt.textContent = _msg; _tt.style.color = '#22c55e'; }
+
+          await seedFirestoreIfEmpty();
+          startFirestoreListeners();
+          listenAjustes();
+          startFlujoListeners();
+        } else {
+          const _st = document.getElementById('firebase-status');
+          if (_st) { _st.textContent = '🔴 Firebase no disponible'; _st.style.color = '#ef4444'; }
         }
-      }, { once: true });
+      }, 0);
     })();
 
     // ════════════════════════════════════════════════════════════════════
