@@ -812,6 +812,40 @@
       margin-top: 4px;
     }
 
+
+    /* ── SORTABLE TABLE HEADERS ── */
+    .sortable-th {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .sortable-th:hover { color: var(--accent); }
+    .sortable-th::after {
+      content: ' ⇅';
+      font-size: 10px;
+      opacity: 0.4;
+    }
+    .sortable-th.sort-asc::after  { content: ' ↑'; opacity: 1; color: var(--accent); }
+    .sortable-th.sort-desc::after { content: ' ↓'; opacity: 1; color: var(--accent); }
+    .table-filter-row th {
+      padding: 4px 6px !important;
+      background: var(--surface2);
+    }
+    .table-filter-row input, .table-filter-row select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 11px;
+      width: 100%;
+      outline: none;
+    }
+    .table-filter-row input:focus, .table-filter-row select:focus {
+      border-color: var(--accent);
+    }
+
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -1762,14 +1796,24 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Remisión</th>
-              <th>Cliente</th>
-              <th>Vendedor</th>
-              <th>Productos</th>
-              <th>Total</th>
-              <th>Condición</th>
-              <th>Acciones</th>
+              <th class="sortable-th" onclick="sortTable('ventas-tbody',0,'date')" title="Click para ordenar">Fecha</th>
+              <th class="sortable-th" onclick="sortTable('ventas-tbody',1,'num')" title="Click para ordenar">Remisión</th>
+              <th class="sortable-th" onclick="sortTable('ventas-tbody',2,'str')" title="Click para ordenar">Cliente</th>
+              <th class="sortable-th" onclick="sortTable('ventas-tbody',3,'str')" title="Click para ordenar">Vendedor</th>
+              <th class="sortable-th" onclick="sortTable('ventas-tbody',4,'num')" title="Click para ordenar">Productos</th>
+              <th class="sortable-th" onclick="sortTable('ventas-tbody',5,'num')" title="Click para ordenar">Total</th>
+              <th class="sortable-th" onclick="sortTable('ventas-tbody',6,'str')" title="Click para ordenar">Condición</th>
+              <th>Acciones <button class="btn sm secondary" style="padding:2px 6px;font-size:9px;margin-left:4px" onclick="clearTableFilters('ventas-tbody')" title="Limpiar filtros">✕</button></th>
+            </tr>
+            <tr class="table-filter-row">
+              <th><input placeholder="Fecha..." oninput="filterTableCol('ventas-tbody',0,this.value)"></th>
+              <th><input placeholder="Rem..." oninput="filterTableCol('ventas-tbody',1,this.value)"></th>
+              <th><input placeholder="Cliente..." oninput="filterTableCol('ventas-tbody',2,this.value)"></th>
+              <th><input placeholder="Vendedor..." oninput="filterTableCol('ventas-tbody',3,this.value)"></th>
+              <th></th>
+              <th><input placeholder="$..." oninput="filterTableCol('ventas-tbody',5,this.value)"></th>
+              <th><select onchange="filterTableCol('ventas-tbody',6,this.value)"><option value="">Todas</option><option value="Contado">Contado</option><option value="Crédito">Crédito</option></select></th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="ventas-tbody">
@@ -1799,13 +1843,23 @@
           <thead>
             <tr>
               <th>#</th>
-              <th>Nombre</th>
-              <th>Categoría</th>
-              <th>Teléfono</th>
-              <th>Barrio</th>
-              <th>Vendedor</th>
-              <th>Crédito</th>
-              <th>Acciones</th>
+              <th class="sortable-th" onclick="sortTable('clientes-tbody',1,'str')" title="Click para ordenar">Nombre</th>
+              <th class="sortable-th" onclick="sortTable('clientes-tbody',2,'str')" title="Click para ordenar">Categoría</th>
+              <th class="sortable-th" onclick="sortTable('clientes-tbody',3,'str')" title="Click para ordenar">Teléfono</th>
+              <th class="sortable-th" onclick="sortTable('clientes-tbody',4,'str')" title="Click para ordenar">Barrio</th>
+              <th class="sortable-th" onclick="sortTable('clientes-tbody',5,'str')" title="Click para ordenar">Vendedor</th>
+              <th class="sortable-th" onclick="sortTable('clientes-tbody',6,'str')" title="Click para ordenar">Crédito</th>
+              <th>Acciones <button class="btn sm secondary" style="padding:2px 6px;font-size:9px;margin-left:4px" onclick="clearTableFilters('clientes-tbody')" title="Limpiar filtros">✕</button></th>
+            </tr>
+            <tr class="table-filter-row">
+              <th></th>
+              <th><input placeholder="Nombre..." oninput="filterTableCol('clientes-tbody',1,this.value)"></th>
+              <th><select onchange="filterTableCol('clientes-tbody',2,this.value)"><option value="">Todas</option><option value="TIENDA">TIENDA</option><option value="SUPERMERCADO">SUPERMERCADO</option><option value="DISTRIBUIDORA">DISTRIBUIDORA</option><option value="RESTAURANTE">RESTAURANTE</option><option value="PASTELERIA">PASTELERIA</option><option value="CARNICERIA">CARNICERIA</option><option value="PANADERIA">PANADERIA</option><option value="SALSAMENTARIA">SALSAMENTARIA</option><option value="ESTANCO">ESTANCO</option><option value="FRUVER">FRUVER</option></select></th>
+              <th><input placeholder="Tel..." oninput="filterTableCol('clientes-tbody',3,this.value)"></th>
+              <th><input placeholder="Barrio..." oninput="filterTableCol('clientes-tbody',4,this.value)"></th>
+              <th><select onchange="filterTableCol('clientes-tbody',5,this.value)"><option value="">Todos</option><option value="JAVIER">JAVIER</option><option value="HERNANDO">HERNANDO</option><option value="BODEGA">BODEGA</option></select></th>
+              <th><select onchange="filterTableCol('clientes-tbody',6,this.value)"><option value="">Todos</option><option value="Sí">Sí</option><option value="No">No</option></select></th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="clientes-tbody"></tbody>
@@ -1830,20 +1884,30 @@
         <table class="data-table compact" style="min-width:1100px">
           <thead>
             <tr>
-              <th>Categoría</th>
-              <th>Producto</th>
-              <th>Unidad</th>
-              <th>Costo</th>
-              <th>Precio 1</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',0,'str')" title="Click para ordenar">Categoría</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',1,'str')" title="Click para ordenar">Producto</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',2,'str')" title="Click para ordenar">Unidad</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',3,'num')" title="Click para ordenar">Costo</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',4,'num')" title="Click para ordenar">Precio 1</th>
               <th>%</th>
-              <th>Precio 2</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',6,'num')" title="Click para ordenar">Precio 2</th>
               <th>%</th>
-              <th>Precio 3</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',8,'num')" title="Click para ordenar">Precio 3</th>
               <th>%</th>
-              <th>Precio 4</th>
-              <th>Últ. Act.</th>
-              <th>Proveedor</th>
-              <th>Acciones</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',10,'num')" title="Click para ordenar">Precio 4</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',11,'date')" title="Click para ordenar">Últ. Act.</th>
+              <th class="sortable-th" onclick="sortTable('productos-tbody',12,'str')" title="Click para ordenar">Proveedor</th>
+              <th>Acciones <button class="btn sm secondary" style="padding:2px 6px;font-size:9px;margin-left:4px" onclick="clearTableFilters('productos-tbody')" title="Limpiar">✕</button></th>
+            </tr>
+            <tr class="table-filter-row">
+              <th><input placeholder="Categ..." oninput="filterTableCol('productos-tbody',0,this.value)"></th>
+              <th><input placeholder="Producto..." oninput="filterTableCol('productos-tbody',1,this.value)"></th>
+              <th><input placeholder="Unidad..." oninput="filterTableCol('productos-tbody',2,this.value)"></th>
+              <th></th>
+              <th><input placeholder="Precio..." oninput="filterTableCol('productos-tbody',4,this.value)"></th>
+              <th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+              <th><input placeholder="Proveedor..." oninput="filterTableCol('productos-tbody',12,this.value)"></th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="productos-tbody"></tbody>
@@ -1863,12 +1927,20 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Proveedor</th>
-              <th>NIT</th>
-              <th>Teléfono</th>
-              <th>Condición</th>
-              <th>Notas</th>
-              <th>Acciones</th>
+              <th class="sortable-th" onclick="sortTable('proveedores-tbody',0,'str')" title="Click para ordenar">Proveedor</th>
+              <th class="sortable-th" onclick="sortTable('proveedores-tbody',1,'str')" title="Click para ordenar">NIT</th>
+              <th class="sortable-th" onclick="sortTable('proveedores-tbody',2,'str')" title="Click para ordenar">Teléfono</th>
+              <th class="sortable-th" onclick="sortTable('proveedores-tbody',3,'str')" title="Click para ordenar">Condición</th>
+              <th class="sortable-th" onclick="sortTable('proveedores-tbody',4,'str')" title="Click para ordenar">Notas</th>
+              <th>Acciones <button class="btn sm secondary" style="padding:2px 6px;font-size:9px;margin-left:4px" onclick="clearTableFilters('proveedores-tbody')" title="Limpiar">✕</button></th>
+            </tr>
+            <tr class="table-filter-row">
+              <th><input placeholder="Proveedor..." oninput="filterTableCol('proveedores-tbody',0,this.value)"></th>
+              <th><input placeholder="NIT..." oninput="filterTableCol('proveedores-tbody',1,this.value)"></th>
+              <th><input placeholder="Tel..." oninput="filterTableCol('proveedores-tbody',2,this.value)"></th>
+              <th><select onchange="filterTableCol('proveedores-tbody',3,this.value)"><option value="">Todos</option><option value="Contado">Contado</option><option value="Crédito">Crédito</option></select></th>
+              <th><input placeholder="Notas..." oninput="filterTableCol('proveedores-tbody',4,this.value)"></th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="proveedores-tbody"></tbody>
@@ -1921,15 +1993,23 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Estado</th>
-              <th>Producto</th>
-              <th>Unidad</th>
-              <th>Entradas (compras)</th>
-              <th>Salidas (ventas)</th>
-              <th>Ajustes</th>
-              <th>Stock Actual</th>
-              <th>Stock Mínimo</th>
-              <th>Nivel</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',0,'str')" title="Click para ordenar">Estado</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',1,'str')" title="Click para ordenar">Producto</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',2,'str')" title="Click para ordenar">Unidad</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',3,'num')" title="Click para ordenar">Entradas</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',4,'num')" title="Click para ordenar">Salidas</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',5,'num')" title="Click para ordenar">Ajustes</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',6,'num')" title="Click para ordenar">Stock Actual</th>
+              <th class="sortable-th" onclick="sortTable('inv-tbody',7,'num')" title="Click para ordenar">Stock Mínimo</th>
+              <th>Nivel <button class="btn sm secondary" style="padding:2px 6px;font-size:9px;margin-left:4px" onclick="clearTableFilters('inv-tbody')" title="Limpiar">✕</button></th>
+            </tr>
+            <tr class="table-filter-row">
+              <th><select onchange="filterTableCol('inv-tbody',0,this.value)"><option value="">Todos</option><option value="OK">OK</option><option value="Bajo">Bajo</option><option value="Agotado">Agotado</option></select></th>
+              <th><input placeholder="Producto..." oninput="filterTableCol('inv-tbody',1,this.value)"></th>
+              <th><input placeholder="Unidad..." oninput="filterTableCol('inv-tbody',2,this.value)"></th>
+              <th></th><th></th><th></th>
+              <th><input placeholder="Stock..." oninput="filterTableCol('inv-tbody',6,this.value)"></th>
+              <th></th><th></th>
             </tr>
           </thead>
           <tbody id="inv-tbody">
@@ -2032,18 +2112,24 @@
         <table class="flujo-table" style="min-width:960px">
           <thead>
             <tr>
-              <th style="width:40px">Día</th>
-              <th style="min-width:220px;text-align:left">Rubro</th>
-              <th style="min-width:160px;text-align:left">Detalle</th>
-              <th style="color:var(--green)">Ing. Op.</th>
-              <th style="color:var(--blue)">Otros Ing.</th>
-              <th style="color:var(--red)">Gastos</th>
-              <th style="color:var(--accent)">Compras</th>
-              <th style="color:#8b5cf6">Proveedores</th>
-              <th style="color:#ec4899">Provisiones</th>
-              <th style="color:#06b6d4">Créditos</th>
-              <th>Saldo</th>
-              <th style="width:70px"></th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',0,'num')" style="width:40px">Día</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',1)" style="min-width:220px;text-align:left">Rubro</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',2)" style="min-width:160px;text-align:left">Detalle</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',3,'num')" style="color:var(--green)">Ing. Op.</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',4,'num')" style="color:var(--blue)">Otros Ing.</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',5,'num')" style="color:var(--red)">Gastos</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',6,'num')" style="color:var(--accent)">Compras</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',7,'num')" style="color:#8b5cf6">Proveedores</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',8,'num')" style="color:#ec4899">Provisiones</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',9,'num')" style="color:#06b6d4">Créditos</th>
+              <th class="sortable-th" onclick="sortTable('flujo-tbody',10,'num')">Saldo</th>
+              <th style="width:70px"><button class="btn sm secondary" style="padding:2px 6px;font-size:9px" onclick="clearTableFilters('flujo-tbody')" title="Limpiar">✕</button></th>
+            </tr>
+            <tr class="table-filter-row">
+              <th><input placeholder="Día..." oninput="filterTableCol('flujo-tbody',0,this.value)"></th>
+              <th><input placeholder="Rubro..." oninput="filterTableCol('flujo-tbody',1,this.value)"></th>
+              <th><input placeholder="Detalle..." oninput="filterTableCol('flujo-tbody',2,this.value)"></th>
+              <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
             </tr>
           </thead>
           <tbody id="flujo-tbody">
@@ -2124,22 +2210,26 @@
           <option value="parcial">Parciales</option>
           <option value="pagado">Pagados</option>
         </select>
-        <button class="btn secondary" onclick="exportPDFEntregas()" title="Exportar reporte PDF de entregas y cobros">🖨
-          PDF</button>
+        <button class="btn secondary" onclick="exportPDFEntregas()" title="Exportar reporte PDF de entregas y cobros">🖨 PDF</button>
+        <label class="btn secondary" style="cursor:pointer" title="Cargar historial CXC desde Excel (misma estructura que el Excel mensual)">
+          📂 Cargar Excel
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleCXCImport(this)">
+        </label>
         <button class="btn" onclick="openEntregaModal()">+ Agregar CXC</button>
       </div>
+      <div id="cxc-import-status" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:12px;font-family:var(--mono)"></div>
 
       <!-- Weekly grid table -->
       <div class="table-wrap" style="overflow-x:auto">
         <table class="data-table" style="min-width:1200px" id="entregas-table">
           <thead>
             <tr id="entregas-header-weeks">
-              <th rowspan="2">Fecha</th>
-              <th rowspan="2">Cliente</th>
-              <th rowspan="2">Rem.</th>
-              <th rowspan="2">Vr. Venta</th>
-              <th rowspan="2">CXC</th>
-              <th rowspan="2">Días</th>
+              <th rowspan="2" class="sortable-th" onclick="sortTable('entregas-tbody',0,'date')" title="Ordenar">Fecha</th>
+              <th rowspan="2" class="sortable-th" onclick="sortTable('entregas-tbody',1)" title="Ordenar">Cliente</th>
+              <th rowspan="2" class="sortable-th" onclick="sortTable('entregas-tbody',2,'num')" title="Ordenar">Rem.</th>
+              <th rowspan="2" class="sortable-th" onclick="sortTable('entregas-tbody',3,'num')" title="Ordenar">Vr. Venta</th>
+              <th rowspan="2" class="sortable-th" onclick="sortTable('entregas-tbody',4,'num')" title="Ordenar">CXC</th>
+              <th rowspan="2" class="sortable-th" onclick="sortTable('entregas-tbody',5,'num')" title="Ordenar">Días <button class="btn sm secondary" style="padding:2px 4px;font-size:9px;margin-left:2px" onclick="event.stopPropagation();clearTableFilters('entregas-tbody')" title="Limpiar">✕</button></th>
               <th colspan="7" style="text-align:center;color:var(--green)">SEM 1</th>
               <th colspan="7" style="text-align:center;color:var(--green)">SEM 2</th>
               <th colspan="7" style="text-align:center;color:var(--green)">SEM 3</th>
@@ -2318,7 +2408,7 @@
         <div id="v-items"></div>
         <div class="total-section">
           <div class="total-row"><span class="total-label">SUBTOTAL</span><span id="v-subtotal"
-              style="font-family:var(--mono);font-size:14px">$0.00</span></div>
+              style="font-family:var(--mono);font-size:14px">$0</span></div>
           <div class="total-row">
             <span class="total-label">DESCUENTO</span>
             <input type="number" class="total-input-small" id="v-descuento" value="0" min="0" oninput="calcVentaTotal()"
@@ -2331,7 +2421,7 @@
           </div>
           <div class="total-divider"></div>
           <div class="total-row"><span class="total-label" style="font-weight:700;color:var(--text)">TOTAL
-              REMISIÓN</span><span class="total-value" id="v-total">$0.00</span></div>
+              REMISIÓN</span><span class="total-value" id="v-total">$0</span></div>
         </div>
       </div>
 
@@ -3972,6 +4062,13 @@
       const decimals = (Math.abs(num) < 1 && num !== 0) ? 2 : 0;
       return num.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     }
+    // Parse COP-formatted string back to number
+    // "$127.200" → 127200 | "$3.600" → 3600 | "$0,50" → 0.5
+    function parseCOP(str) {
+      if (!str) return 0;
+      const s = str.replace(/[^0-9,]/g, ''); // remove $ and dots
+      return parseFloat(s.replace(',', '.')) || 0;
+    }
     function today() { return new Date().toISOString().split('T')[0]; }
     function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
     function toast(msg, type = 'info') {
@@ -4227,14 +4324,17 @@
       const prec = parseFloat(document.getElementById(`${pre}-precio-${rowIdx}`)?.value) || 0;
       const sub = cant * prec;
       const subEl = document.getElementById(`${pre}-sub-${rowIdx}`);
-      if (subEl) subEl.textContent = fmt(sub);
+      if (subEl) {
+        subEl.textContent = fmt(sub);
+        subEl.dataset.raw = sub; // store raw value to avoid parsing COP-formatted text
+      }
       if (mode === 'v') calcVentaTotal(); else calcCompraTotal();
     }
 
     function calcVentaTotal() {
       let sub = 0;
       document.querySelectorAll('[id^="vi-sub-"]').forEach(el => {
-        sub += parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        sub += parseFloat(el.dataset.raw) || parseCOP(el.textContent) || 0;
       });
       document.getElementById('v-subtotal').textContent = fmt(sub);
       const desc = parseFloat(document.getElementById('v-descuento').value) || 0;
@@ -4245,7 +4345,7 @@
     function calcCompraTotal() {
       let total = 0;
       document.querySelectorAll('[id^="ci-sub-"]').forEach(el => {
-        total += parseFloat(el.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        total += parseFloat(el.dataset.raw) || parseCOP(el.textContent) || 0;
       });
       document.getElementById('c-total').textContent = fmt(total);
     }
@@ -4263,7 +4363,7 @@
     <input id="vi-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
     <input id="vi-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant || ''}" oninput="calcItemTotal(${i},'v')">
     <input id="vi-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio || ''}" oninput="calcItemTotal(${i},'v')">
-    <span id="vi-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0.00'}</span>
+    <span id="vi-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px" data-raw="${data.cant && data.precio ? data.cant * data.precio : 0}">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0'}</span>
     <button class="item-del" onclick="removeRow('vi-row-${i}','v')">×</button>`;
       return div;
     }
@@ -4281,7 +4381,7 @@
     <input id="ci-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
     <input id="ci-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant || ''}" oninput="calcItemTotal(${i},'c')">
     <input id="ci-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio || ''}" oninput="calcItemTotal(${i},'c')">
-    <span id="ci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0.00'}</span>
+    <span id="ci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px" data-raw="${data.cant && data.precio ? data.cant * data.precio : 0}">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0'}</span>
     <button class="item-del" onclick="removeRow('ci-row-${i}','c')">×</button>`;
       return div;
     }
@@ -4419,7 +4519,7 @@
       // ── Currency formatter — single clean string, no split $ ─────────
       function fmtCOP(n) {
         const num = Math.round(n || 0);
-        return '$ ' + num.toLocaleString('es-CO') + ',00';
+        return '$ ' + num.toLocaleString('es-CO');
       }
 
       // ── TITLE
@@ -5393,6 +5493,240 @@
       renderEntregas();
       toast(`Cobro día ${dia} registrado ✓`, 'success');
     }
+
+
+    // ════════════════════════════════════════════════════════════
+    // TABLA SORT + FILTER UTILITIES
+    // ════════════════════════════════════════════════════════════
+    const _sortState = {}; // { tbodyId: { col, dir } }
+
+    function sortTable(tbodyId, colIdx, type = 'str') {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+      const prev = _sortState[tbodyId] || {};
+      const dir = (prev.col === colIdx && prev.dir === 'asc') ? 'desc' : 'asc';
+      _sortState[tbodyId] = { col: colIdx, dir };
+
+      // Update header indicators
+      const thead = tbody.closest('table').querySelector('thead');
+      thead.querySelectorAll('.sortable-th').forEach((th, i) => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (i === colIdx) th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
+      });
+
+      // Get visible rows only (respect current filter)
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+      const hidden = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display === 'none');
+
+      rows.sort((a, b) => {
+        const cellA = a.cells[colIdx]?.textContent?.trim() || '';
+        const cellB = b.cells[colIdx]?.textContent?.trim() || '';
+        let cmp = 0;
+        if (type === 'num') {
+          const numA = parseCOP(cellA) || parseFloat(cellA.replace(/[^0-9.-]/g,'')) || 0;
+          const numB = parseCOP(cellB) || parseFloat(cellB.replace(/[^0-9.-]/g,'')) || 0;
+          cmp = numA - numB;
+        } else if (type === 'date') {
+          cmp = cellA.localeCompare(cellB);
+        } else {
+          cmp = cellA.localeCompare(cellB, 'es', { sensitivity: 'base' });
+        }
+        return dir === 'asc' ? cmp : -cmp;
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
+      hidden.forEach(r => tbody.appendChild(r));
+    }
+
+    function filterTableCol(tbodyId, colIdx, val) {
+      const v = val.toUpperCase().trim();
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+      tbody.querySelectorAll('tr').forEach(row => {
+        if (row.classList.contains('no-filter')) return;
+        const cell = row.cells[colIdx]?.textContent?.trim().toUpperCase() || '';
+        row.style.display = (!v || cell.includes(v)) ? '' : 'none';
+      });
+    }
+
+    function clearTableFilters(tbodyId) {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+      tbody.closest('table')?.querySelectorAll('.table-filter-row input, .table-filter-row select')
+        .forEach(el => { el.value = ''; });
+      tbody.querySelectorAll('tr').forEach(r => r.style.display = '');
+      // Clear sort state
+      delete _sortState[tbodyId];
+      tbody.closest('table')?.querySelectorAll('.sortable-th')
+        .forEach(th => th.classList.remove('sort-asc','sort-desc'));
+    }
+
+
+    // ════════════════════════════════════════════════════════════════════
+    // IMPORTAR HISTORIAL ENTREGAS Y COBROS DESDE EXCEL
+    // Mismo patrón que handleFlujoImport — FileReader + XLSX + Firebase batch
+    // ════════════════════════════════════════════════════════════════════
+
+    function handleCXCImport(input) {
+      const file = input.files[0];
+      if (!file) return;
+      input.value = '';
+
+      if (typeof XLSX === 'undefined') { toast('Librería Excel no disponible', 'error'); return; }
+
+      const statusEl = document.getElementById('cxc-import-status');
+      statusEl.style.display = 'block';
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = `⏳ Leyendo "${file.name}"...`;
+
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          // cellDates:true → dates come as JS Date objects (not strings)
+          const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+
+          // Find ENTREGAS sheet
+          const sheetName = wb.SheetNames.find(n =>
+            n.toUpperCase().includes('ENTREGA') || n.toUpperCase().includes('COBRO')
+          );
+          if (!sheetName) throw new Error(`No se encontró hoja "ENTREGAS Y COBROS" en "${file.name}"`);
+
+          // Parse sheet as array of arrays (raw values, dates as Date objects)
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {
+            header: 1, defval: null, raw: true
+          });
+
+          if (rows.length < 3) throw new Error('Archivo sin datos suficientes');
+
+          // ── Detect day columns from header row (row index 1) ─────
+          // Row 0: title | Row 1: FECHA,CLIENTE,REMISION,VR.COBRO,_,_,_,_, day1, day2...
+          // Col 6 = CXC, Col 7 = DIAS (from row 0), Col 8+ = day numbers (from row 1)
+          const hdr = rows[1] || [];
+          const dayColMap = {}; // colIndex → dayNumber
+          for (let c = 8; c < hdr.length; c++) {
+            const v = hdr[c];
+            if (v !== null && v !== undefined && v !== '') {
+              const num = parseInt(String(v));
+              if (!isNaN(num) && num >= 1 && num <= 31) dayColMap[c] = num;
+            }
+          }
+
+          // ── Parse data rows ──────────────────────────────────────
+          let added = 0, skipped = 0;
+          const fbUpdates = {};
+          const mesesDetectados = new Set();
+
+          for (let r = 2; r < rows.length; r++) {
+            const row = rows[r];
+            if (!row || row[0] === null || row[1] === null) continue;
+
+            // Parse fecha — comes as Date object when cellDates:true
+            let fechaStr = '';
+            const rawFecha = row[0];
+            if (rawFecha instanceof Date) {
+              // Adjust for timezone offset
+              const d = new Date(rawFecha.getTime() - rawFecha.getTimezoneOffset() * 60000);
+              fechaStr = d.toISOString().slice(0, 10);
+            } else if (typeof rawFecha === 'string') {
+              const clean = rawFecha.trim();
+              if (clean.match(/^\d{4}-\d{2}-\d{2}/)) {
+                fechaStr = clean.slice(0, 10);
+              } else if (clean.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+                const [d, m, y] = clean.split('/');
+                fechaStr = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+              } else if (clean.match(/^\d+\/\d+\/\d+/)) {
+                // M/D/YYYY
+                const parts = clean.split('/');
+                if (parts.length === 3) {
+                  fechaStr = `${parts[2].padStart(4,'0')}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+                }
+              }
+            } else if (typeof rawFecha === 'number') {
+              // Excel serial date
+              const d = new Date(Math.round((rawFecha - 25569) * 86400 * 1000));
+              fechaStr = d.toISOString().slice(0, 10);
+            }
+            if (!fechaStr || fechaStr < '2020-01-01') continue;
+
+            const cliente  = String(row[1] || '').trim().toUpperCase();
+            const remision = String(row[2] || '').trim();
+            const valor    = parseFloat(String(row[3] || '0').replace(/[^0-9.-]/g,'')) || 0;
+            const cxc      = parseFloat(String(row[6] || '0').replace(/[^0-9.-]/g,'')) || 0;
+
+            if (!cliente || !remision || valor <= 0) continue;
+
+            const mes = fechaStr.slice(0, 7);
+            mesesDetectados.add(mes);
+
+            // Stable ID
+            const cleanId = ('ent_' + fechaStr.replace(/-/g,'') + '_' + remision + '_' +
+                             cliente.replace(/[^A-Z0-9]/g,'').slice(0,8))
+                            .slice(0, 60);
+
+            // Skip duplicates
+            if (state.entregas.find(e => e.id === cleanId)) { skipped++; continue; }
+
+            // Build cobros array from day columns
+            const cobros = [];
+            for (const [colIdx, dayNum] of Object.entries(dayColMap)) {
+              const v = row[parseInt(colIdx)];
+              if (v !== null && v !== undefined) {
+                const amount = parseFloat(String(v).replace(/[^0-9.-]/g,'')) || 0;
+                if (amount > 0) cobros.push({ dia: dayNum, valor: amount, medio: 'Efectivo', nota: '' });
+              }
+            }
+
+            const totalCobrado = cobros.reduce((s, c) => s + c.valor, 0);
+            const rec = {
+              id: cleanId,
+              fecha: fechaStr,
+              cliente,
+              remision,
+              valor,
+              cxc: cxc > 0 ? cxc : Math.max(0, valor - totalCobrado),
+              mes,
+              cobros,
+              createdAt: new Date().toISOString(),
+              importado: true,
+            };
+
+            state.entregas.push(rec);
+            fbUpdates['javval/entregas_cxc/' + cleanId] = { ...rec, _ts: Date.now() };
+            added++;
+          }
+
+          // ── Save locally ──────────────────────────────────────────
+          saveFlujoLocal();
+
+          // ── Firebase batch write ──────────────────────────────────
+          if (added > 0 && window.FS) {
+            statusEl.textContent = `⏳ Guardando ${added} registros en Firebase...`;
+            const entries = Object.entries(fbUpdates);
+            for (let i = 0; i < entries.length; i += 100) {
+              const batch = Object.fromEntries(entries.slice(i, i + 100));
+              await window.FS.db.ref().update(batch);
+            }
+          }
+
+          renderEntregas();
+          updateBadges();
+
+          const mesesStr = Array.from(mesesDetectados).sort().join(', ');
+          statusEl.style.color = added > 0 ? 'var(--green)' : 'var(--text3)';
+          statusEl.textContent = `✅ "${file.name}" — ${added} registros nuevos, ${skipped} ya existían. Meses: ${mesesStr}`;
+          toast(`Importados ${added} registros CXC`, added > 0 ? 'success' : 'info');
+
+        } catch (e) {
+          statusEl.style.color = 'var(--red)';
+          statusEl.textContent = '❌ Error: ' + e.message;
+          console.error('CXC import error:', e);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function toggleImportCXC() {} // kept for backward compat
+
 
     // ════════════════════════════════════════════════════════════════════
     // RUBROS MAESTRO — extraídos de los Excel operativos
@@ -6430,7 +6764,7 @@
         <input id="fci-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad||''}" readonly>
         <input id="fci-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant||''}" oninput="calcFCItem(${i})">
         <input id="fci-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio||''}" oninput="calcFCItem(${i})">
-        <span id="fci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px">${data.cant && data.precio ? fmt(data.cant*data.precio) : '$0.00'}</span>
+        <span id="fci-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px" data-raw="${data.cant && data.precio ? data.cant*data.precio : 0}">${data.cant && data.precio ? fmt(data.cant*data.precio) : '$0'}</span>
         <button class="item-del" onclick="removeFCIRow('fci-row-${i}')">×</button>`;
       container.appendChild(div);
       if (data.cant && data.precio) calcFCTotal();
@@ -6457,7 +6791,7 @@
       let total = 0;
       document.querySelectorAll('[id^="fci-sub-"]').forEach(el => {
         // Use data-raw if available (set by calcFCItem), else parse formatted text
-        total += parseFloat(el.dataset.raw) || parseFloat(el.textContent.replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
+        total += parseFloat(el.dataset.raw) || parseCOP(el.textContent) || 0;
       });
       const totalEl = document.getElementById('fl-compra-total');
       if (totalEl) totalEl.textContent = fmt(total);
