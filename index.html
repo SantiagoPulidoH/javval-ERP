@@ -8,6 +8,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"
     rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -2326,6 +2327,18 @@
       <h1 class="section-title">⚙ Setup — Configuración</h1>
       <p class="section-sub">Administra rubros del flujo de caja, categorías y configuraciones del sistema</p>
 
+      <!-- VENDEDORES SECTION -->
+      <div class="setup-section" style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div class="setup-section-title">👤 Vendedores</div>
+            <div class="setup-section-sub">Define los vendedores disponibles para seleccionar al registrar ventas.</div>
+          </div>
+          <button class="btn" onclick="openVendedorSetupModal()">+ Agregar Vendedor</button>
+        </div>
+        <div id="vendedores-setup-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+
       <!-- RUBROS SECTION -->
       <div class="setup-section">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -2382,8 +2395,12 @@
             <input type="hidden" id="v-cliente-val">
           </div>
         </div>
-        <div class="form-group"><label class="form-label">Vendedor</label><input type="text" class="form-input"
-            id="v-vendedor" placeholder="Ej: JAVIER MURCIA"></div>
+        <div class="form-group"><label class="form-label">Vendedor</label><div style="display:flex;gap:8px">
+          <input type="text" class="form-input" id="v-vendedor" 
+            placeholder="Seleccionar o escribir..."
+            list="vendedores-list" autocomplete="off">
+          <datalist id="vendedores-list"></datalist>
+          </div></div>
         <div class="form-group"><label class="form-label">Condición de Venta</label>
           <select class="form-select" id="v-condicion">
             <option value="Contado">Contado</option>
@@ -2931,6 +2948,27 @@
   </div>
 
   <!-- ═══ MODAL NUEVO RUBRO ═══ -->
+  <div class="modal-overlay" id="modal-vendedor-setup">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <h2 class="modal-title">Agregar Vendedor</h2>
+        <button class="modal-close" onclick="closeModal('modal-vendedor-setup')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nombre del Vendedor *</label>
+          <input type="text" class="form-input" id="vend-setup-nombre"
+            placeholder="Ej: CARLOS GOMEZ" style="text-transform:uppercase"
+            onkeydown="if(event.key==='Enter') saveVendedorSetup()">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn secondary" onclick="closeModal('modal-vendedor-setup')">Cancelar</button>
+        <button class="btn" onclick="saveVendedorSetup()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-rubro">
     <div class="modal" style="max-width:480px">
       <div class="modal-header">
@@ -3880,6 +3918,7 @@
     // STATE  (localStorage = offline cache)
     // ════════════════════════════════════════════
     let state = {
+      vendedores:  JSON.parse(localStorage.getItem('jv_vendedores')  || JSON.stringify(['JAVIER MURCIA','HERNANDO','BODEGA'])),
       ventas:      JSON.parse(localStorage.getItem('jv_ventas')      || '[]'),
       compras:     JSON.parse(localStorage.getItem('jv_compras')     || '[]'),
       cobros:      JSON.parse(localStorage.getItem('jv_cobros')      || '[]'),
@@ -3910,6 +3949,7 @@
       };
       // Keep last 200 ventas locally as fast-load cache; rest from Firebase
       const ventasCache = state.ventas.slice(0, 200);
+      safeSet('jv_vendedores', state.vendedores);
       safeSet('jv_ventas',      ventasCache);
       safeSet('jv_compras',     state.compras.slice(0, 200));
       safeSet('jv_cobros',      state.cobros);
@@ -4078,7 +4118,11 @@
     }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
     document.addEventListener('click', e => {
-      if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+      if (!e.target.classList.contains('modal-overlay')) return;
+      // Modales con datos importantes: NO se cierran con clic exterior
+      const safeModals = ['modal-venta','modal-compra','modal-flujo','modal-ajuste'];
+      if (safeModals.includes(e.target.id)) return;
+      e.target.classList.remove('open');
     });
 
     // Sidebar JS
@@ -4264,7 +4308,7 @@
         }
       }
 
-      if (pEl) pEl.value = mode === 'v' ? precio1.toFixed(2) : costo.toFixed(2);
+      if (pEl) pEl.value = mode === 'v' ? Math.round(precio1) : Math.round(costo);
       calcItemTotal(rowIdx, mode);
     }
 
@@ -4274,7 +4318,7 @@
       const pEl = document.getElementById(`${pre}-precio-${rowIdx}`);
       const unidad = uEl?.value;
       const prod = state.productos.find(p => p.nombre.toUpperCase() === nombre.toUpperCase() && p.unidad === unidad);
-      if (prod && pEl) pEl.value = (mode === 'v' ? prod.precio1 : prod.costo).toFixed(2);
+      if (prod && pEl) pEl.value = Math.round(mode === 'v' ? prod.precio1 : prod.costo);
       calcItemTotal(rowIdx, mode);
     }
 
@@ -4362,7 +4406,7 @@
     </div>
     <input id="vi-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
     <input id="vi-cant-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0" value="${data.cant || ''}" oninput="calcItemTotal(${i},'v')">
-    <input id="vi-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="0.01" placeholder="0.00" value="${data.precio || ''}" oninput="calcItemTotal(${i},'v')">
+    <input id="vi-precio-${i}" class="form-input" style="font-size:12px;padding:7px 10px" type="number" step="1" min="0" placeholder="0" value="${data.precio || ''}" oninput="calcItemTotal(${i},'v')">
     <span id="vi-sub-${i}" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding-top:10px" data-raw="${data.cant && data.precio ? data.cant * data.precio : 0}">${data.cant && data.precio ? fmt(data.cant * data.precio) : '$0'}</span>
     <button class="item-del" onclick="removeRow('vi-row-${i}','v')">×</button>`;
       return div;
@@ -4415,7 +4459,7 @@
         const unidad = uEl?.value || '';
         const cant = parseFloat(document.getElementById(`${prefix}-cant-${idx}`)?.value) || 0;
         const precio = parseFloat(document.getElementById(`${prefix}-precio-${idx}`)?.value) || 0;
-        if (nombre && cant > 0) items.push({ nombre, unidad, cant, precio, subtotal: +(cant * precio).toFixed(2) });
+        if (nombre && cant > 0) items.push({ nombre, unidad, cant, precio, subtotal: Math.round(cant * precio) });
       });
       return items;
     }
@@ -4426,9 +4470,10 @@
     function openVentaModal(id = null) {
       editingId.venta = id;
       itemCounter = 0;
+      updateVendedoresDatalist();
       document.getElementById('v-items').innerHTML = '';
-      document.getElementById('v-total').textContent = '$0.00';
-      document.getElementById('v-subtotal').textContent = '$0.00';
+      document.getElementById('v-total').textContent = '$0';
+      document.getElementById('v-subtotal').textContent = '$0';
       document.getElementById('modal-venta-title').textContent = id ? 'Editar Venta' : 'Nueva Venta';
       document.getElementById('btn-imprimir-venta').style.display = id ? 'inline-flex' : 'none';
 
@@ -4473,7 +4518,7 @@
       const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
       const descuento = parseFloat(document.getElementById('v-descuento').value) || 0;
       const domicilio = parseFloat(document.getElementById('v-domicilio').value) || 0;
-      const total = +(subtotal - descuento + domicilio).toFixed(2);
+      const total = Math.round(subtotal - descuento + domicilio);
 
       const venta = {
         id: editingId.venta || genId(),
@@ -4481,7 +4526,7 @@
         vendedor: document.getElementById('v-vendedor').value,
         condicion: document.getElementById('v-condicion').value,
         descuento, domicilio, obs: document.getElementById('v-obs').value,
-        items, subtotal: +subtotal.toFixed(2), total,
+        items, subtotal: Math.round(subtotal), total,
         createdAt: new Date().toISOString(),
       };
 
@@ -4852,11 +4897,11 @@
         document.getElementById('p-nombre').value = p.nombre;
         document.getElementById('p-unidad').value = p.unidad;
         document.getElementById('p-categoria').value = p.categoria || '';
-        document.getElementById('p-costo').value = p.costo?.toFixed(2) || '';
-        document.getElementById('p-precio1').value = p.precio1?.toFixed(2) || '';
-        document.getElementById('p-precio2').value = p.precio2?.toFixed(2) || '';
-        document.getElementById('p-precio3').value = p.precio3?.toFixed(2) || '';
-        document.getElementById('p-precio4').value = p.precio4?.toFixed(2) || '';
+        document.getElementById('p-costo').value = p.costo ? Math.round(p.costo) : '';
+        document.getElementById('p-precio1').value = p.precio1 ? Math.round(p.precio1) : '';
+        document.getElementById('p-precio2').value = p.precio2 ? Math.round(p.precio2) : '';
+        document.getElementById('p-precio3').value = p.precio3 ? Math.round(p.precio3) : '';
+        document.getElementById('p-precio4').value = p.precio4 ? Math.round(p.precio4) : '';
         document.getElementById('p-ult-act').value = p.ultAct || '';
         document.getElementById('p-proveedor').value = p.proveedor || '';
         document.getElementById('p-idx').value = idx;
@@ -5729,6 +5774,58 @@
 
 
     // ════════════════════════════════════════════════════════════════════
+    // VENDEDORES SETUP
+    // ════════════════════════════════════════════════════════════════════
+    function renderVendedoresSetup() {
+      const container = document.getElementById('vendedores-setup-list');
+      if (!container) return;
+      const vends = state.vendedores || [];
+      if (!vends.length) {
+        container.innerHTML = '<span style="color:var(--text3);font-size:12px">Sin vendedores registrados</span>';
+        return;
+      }
+      container.innerHTML = vends.map((v, i) => `
+        <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border-radius:8px;padding:6px 12px;font-size:13px">
+          <span>👤 ${v}</span>
+          <button class="btn sm danger" style="padding:2px 8px;font-size:11px" onclick="deleteVendedor(${i})">✕</button>
+        </div>`).join('');
+      // Also update datalist in venta modal
+      updateVendedoresDatalist();
+    }
+
+    function updateVendedoresDatalist() {
+      const dl = document.getElementById('vendedores-list');
+      if (!dl) return;
+      dl.innerHTML = (state.vendedores || []).map(v => `<option value="${v}">`).join('');
+    }
+
+    function openVendedorSetupModal() {
+      document.getElementById('vend-setup-nombre').value = '';
+      document.getElementById('modal-vendedor-setup').classList.add('open');
+      setTimeout(() => document.getElementById('vend-setup-nombre').focus(), 100);
+    }
+
+    function saveVendedorSetup() {
+      const nombre = document.getElementById('vend-setup-nombre').value.trim().toUpperCase();
+      if (!nombre) { toast('Ingresa el nombre del vendedor', 'error'); return; }
+      if (!state.vendedores) state.vendedores = [];
+      if (state.vendedores.includes(nombre)) { toast('Este vendedor ya existe', 'error'); return; }
+      state.vendedores.push(nombre);
+      saveLocal();
+      closeModal('modal-vendedor-setup');
+      renderVendedoresSetup();
+      toast(`Vendedor "${nombre}" agregado ✓`, 'success');
+    }
+
+    function deleteVendedor(idx) {
+      if (!confirm(`¿Eliminar vendedor "${state.vendedores[idx]}"?`)) return;
+      state.vendedores.splice(idx, 1);
+      saveLocal();
+      renderVendedoresSetup();
+      toast('Vendedor eliminado', 'info');
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // RUBROS MAESTRO — extraídos de los Excel operativos
     // ════════════════════════════════════════════════════════════════════
     const RUBROS_MAESTRO = [
@@ -6053,7 +6150,7 @@
       const lEl = document.getElementById(`fci-list-${rowIdx}`);
       if (nEl) nEl.value = nombre;
       if (uEl) uEl.value = unidad;
-      if (pEl && costo > 0) pEl.value = costo.toFixed(2);
+      if (pEl && costo > 0) pEl.value = Math.round(costo);
       if (lEl) lEl.classList.remove('open');
       calcFCItem(rowIdx);
     }
@@ -6105,6 +6202,7 @@
       renderProveedores();
       renderCXPagar();
       updateBadges();
+      updateVendedoresDatalist();
       // Show loading hint if ventas are empty (they come from Firebase)
       if (!state.ventas.length) {
         const tbody = document.getElementById('ventas-tbody');
@@ -6973,7 +7071,7 @@
         const cant = parseFloat(document.getElementById(`fci-cant-${idx}`)?.value) || 0;
         const precio = parseFloat(document.getElementById(`fci-precio-${idx}`)?.value) || 0;
         if (nombre && cant > 0) {
-          compraItems.push({ nombre, unidad, cant, precio, subtotal: +(cant * precio).toFixed(2) });
+          compraItems.push({ nombre, unidad, cant, precio, subtotal: Math.round(cant * precio) });
           // Update product cost
           const pidx = state.productos.findIndex(p =>
             p.nombre.toUpperCase() === nombre.toUpperCase() && p.unidad === unidad);
@@ -7029,6 +7127,7 @@
 
     function renderSetup() {
       renderRubrosGrid(_rubroFilter);
+      renderVendedoresSetup();
     }
 
     function filterRubros(col) {
@@ -8111,7 +8210,7 @@ Las ventas manuales NO se eliminan.`)) {
         const cant   = typeof row[iCant]   === 'number' ? row[iCant]   : parseFloat(String(row[iCant]   || 0).replace(/[^\d.-]/g,'')) || 0;
         const precio = typeof row[iPrecio] === 'number' ? row[iPrecio] : parseFloat(String(row[iPrecio] || 0).replace(/[^\d.-]/g,'')) || 0;
         const tl     = typeof row[iTL]     === 'number' ? row[iTL]     : parseFloat(String(row[iTL]     || 0).replace(/[^\d.-]/g,'')) || 0;
-        const subtotal = tl > 0 ? tl : +(cant * precio).toFixed(2);
+        const subtotal = tl > 0 ? tl : Math.round(cant * precio);
 
         if (!nombre || cant === 0) continue;
         linesTotal++;
@@ -8148,9 +8247,9 @@ Las ventas manuales NO se eliminan.`)) {
       for (const [groupKey, { meta, items }] of remGroups) {
         if (existingKeys.has(groupKey)) { skipped++; continue; }
 
-        const subtotalSum = +items.reduce((s, it) => s + it.subtotal, 0).toFixed(2);
+        const subtotalSum = Math.round(items.reduce((s, it) => s + it.subtotal, 0));
         const total = meta.totalRem > 0 ? meta.totalRem
-                    : +(subtotalSum - meta.descuento + meta.domicilio).toFixed(2);
+                    : Math.round(subtotalSum - meta.descuento + meta.domicilio);
 
         newVentas.push({
           id: 'hist_' + groupKey.replace(/[^a-z0-9]/gi, '_'),
