@@ -952,10 +952,12 @@
 
       /* Tables: horizontal scroll */
       .table-wrap {
-        overflow-x: auto;
+        overflow-x: auto !important;
         -webkit-overflow-scrolling: touch;
       }
-      .data-table { min-width: 600px; }
+      .data-table { min-width: 500px; }
+      /* Dashboard compact tables don't need as much min-width */
+      .data-table.compact { min-width: 300px; }
       .data-table td, .data-table th {
         padding: 8px 10px;
         font-size: 12px;
@@ -1027,8 +1029,40 @@
       /* Import panel */
       .import-panel { padding: 14px; font-size: 12px; }
 
-      /* Top 10 tables on dashboard: stack */
+      /* Top 10 tables on dashboard: stack + own scroll */
       .dash-top-grid { grid-template-columns: 1fr !important; }
+      .dash-top-grid .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .dash-top-grid .data-table {
+        min-width: 280px;
+        max-width: 100%;
+      }
+
+      /* FIX: Sidebar text labels — show when mobile-open regardless of collapsed state */
+      .sidebar.mobile-open .snav-label,
+      .sidebar.mobile-open .sidebar-logo-text,
+      .sidebar.mobile-open .sidebar-brand,
+      .sidebar.mobile-open .sidebar-sub,
+      .sidebar.mobile-open .sidebar-fb-status,
+      .sidebar.mobile-open .snav-badge {
+        opacity: 1 !important;
+        width: auto !important;
+        max-width: none !important;
+        pointer-events: auto !important;
+        overflow: visible !important;
+        white-space: nowrap;
+      }
+      /* Also ensure sidebar items have full width when open */
+      .sidebar.mobile-open .nav-item {
+        padding: 10px 16px !important;
+        justify-content: flex-start !important;
+      }
+      .sidebar.mobile-open {
+        width: 240px !important;
+        overflow: visible;
+      }
     }
 
     /* ═══════════════════════════════════════════════════════════
@@ -1038,6 +1072,12 @@
 
       .kpi-grid { grid-template-columns: 1fr; gap: 8px; }
       .stats-grid { grid-template-columns: 1fr !important; }
+
+      /* All table-wrap containers get own scroll on small phones */
+      .table-wrap {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
 
       .main { padding: 8px; }
       .section-title { font-size: 16px; }
