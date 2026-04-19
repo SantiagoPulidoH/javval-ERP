@@ -2361,7 +2361,7 @@
           <button class="flujo-tab active" id="ftab-caja" onclick="switchFlujoTab('caja')">🏦 CAJA</button>
           <button class="flujo-tab" id="ftab-nequi" onclick="switchFlujoTab('nequi')">📱 NEQUI</button>
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <label class="btn secondary" style="cursor:pointer;margin:0" title="Cargar Excel histórico de Caja/Nequi">
             📂 Cargar Excel
             <input type="file" id="flujo-import-input" accept=".xlsx,.xls" style="display:none"
@@ -2369,6 +2369,7 @@
           </label>
           <button class="btn secondary" onclick="exportPDFFlujo()" title="Exportar reporte PDF del mes actual">🖨
             PDF</button>
+          <button class="btn secondary" style="color:var(--red);border-color:var(--red)" onclick="deleteFlujoMes()" title="Eliminar todos los registros del mes actual (ambas cuentas)">🗑️ Eliminar mes</button>
           <button class="btn" onclick="openFlujoModal()">+ Nuevo Movimiento</button>
         </div>
       </div>
@@ -6657,6 +6658,26 @@
     }
 
 
+    function deleteFlujoMes() {
+      const mesNombre = mesLabel(currentFlujoMes);
+      if (!confirm(`¿Eliminar TODOS los movimientos de ${mesNombre}?\n\nEsto borra Caja + Nequi del mes en el sistema y en Firebase.\nDespués podrás volver a importar el Excel sin duplicados.`)) return;
+      const registros = state.flujo.filter(f => f.mes === currentFlujoMes);
+      if (registros.length === 0) { toast(`No hay registros en ${mesNombre}`, 'info'); return; }
+      // Delete from Firebase
+      if (window.FS) {
+        registros.forEach(f => {
+          const fbId = f._fbId || f.id;
+          if (fbId) window.FS.del('flujo_caja', fbId).catch(e => console.warn('del flujo:', e));
+        });
+      }
+      // Delete from state
+      state.flujo = state.flujo.filter(f => f.mes !== currentFlujoMes);
+      saveFlujoLocal();
+      renderFlujo();
+      updateBadges();
+      toast(`${registros.length} registros de ${mesNombre} eliminados ✓`, 'success');
+    }
+
     function deleteFlujoMov(id) {
       if (!confirm('¿Eliminar este movimiento?')) return;
       const rec = state.flujo.find(f => f.id === id);
@@ -7836,22 +7857,36 @@
             statusEl.textContent = `❌ No se encontraron hojas CAJA o NEQUI en "${file.name}"`;
             return;
           }
-          let added = 0, skipped = 0;
+          let added = 0, updated = 0;
           result.movimientos.forEach(mov => {
-            const exists = state.flujo.find(f =>
-              f.mes === mov.mes && f.cuenta === mov.cuenta &&
-              f.dia === mov.dia && f.rubro === mov.rubro
+            // Generate stable docId — same formula used on write, so re-import hits same key
+            const docId = mov.mes + '_' + mov.cuenta + '_' + String(mov.dia).padStart(2,'0') + '_' + (mov.rubro||'').replace(/[^a-z0-9]/gi,'_').slice(0,30);
+            mov.id   = docId;
+            mov._fbId = docId;
+
+            // Upsert in state.flujo — match by docId (tolerates type mismatches from Firebase)
+            const existIdx = state.flujo.findIndex(f =>
+              (f._fbId && f._fbId === docId) ||
+              (f.id    && f.id    === docId) ||
+              (String(f.mes) === String(mov.mes) &&
+               String(f.cuenta) === String(mov.cuenta) &&
+               String(f.dia) === String(mov.dia) &&
+               String(f.rubro||'').trim().toUpperCase() === String(mov.rubro||'').trim().toUpperCase())
             );
-            if (exists) { skipped++; return; }
-            state.flujo.push(mov);
-            added++;
+            if (existIdx >= 0) {
+              state.flujo[existIdx] = { ...state.flujo[existIdx], ...mov };
+              updated++;
+            } else {
+              state.flujo.push(mov);
+              added++;
+            }
           });
           result.saldosIni.forEach(s => {
             const key = `${s.mes}_${s.cuenta}`;
             if (!state.saldosIni[key]) state.saldosIni[key] = s.valor;
           });
           saveFlujoLocal();
-          // Upload flujo to Firebase with stable IDs (same pattern as ventas)
+          // Upload ALL movements to Firebase using stable docId (set = upsert, no duplicates)
           if (window.FS) {
             const statusFl = document.getElementById('flujo-import-status');
             if (statusFl) {
@@ -7859,14 +7894,9 @@
               statusFl.style.color = 'var(--accent)';
               statusFl.textContent = `⏳ Sincronizando ${result.movimientos.length} movimientos con Firebase…`;
             }
-            // Use set() with stable ID so re-importing doesn't duplicate
-            Promise.all(result.movimientos.map(mov => {
-              const docId = mov.id || (mov.mes + '_' + mov.cuenta + '_' + mov.dia + '_' + (mov.rubro||'').replace(/[^a-z0-9]/gi,'_').slice(0,30));
-              mov.id = docId;
-              return window.FS.set('flujo_caja', docId, toFS(mov))
-                .then(() => { mov._fbId = docId; })
-                .catch(e => console.warn('flujo set:', e));
-            })).then(() => {
+            Promise.all(result.movimientos.map(mov =>
+              window.FS.set('flujo_caja', mov._fbId, toFS(mov)).catch(e => console.warn('flujo set:', e))
+            )).then(() => {
               if (statusFl) {
                 statusFl.style.color = 'var(--green)';
                 statusFl.textContent += ' ✓ Guardado en Firebase.';
@@ -7876,8 +7906,8 @@
           if (result.movimientos.length > 0) currentFlujoMes = result.movimientos[0].mes;
           renderFlujo(); updateBadges();
           statusEl.style.color = 'var(--green)';
-          statusEl.textContent = `✅ "${file.name}" — ${added} movimientos nuevos, ${skipped} ya existían. Meses: ${result.mesesImportados.join(', ')}`;
-          toast(`Importado: ${added} movimientos`, 'success');
+          statusEl.textContent = `✅ "${file.name}" — ${added} nuevos, ${updated} actualizados. Meses: ${result.mesesImportados.join(', ')}`;
+          toast(`Importado: ${added} nuevos, ${updated} actualizados`, 'success');
           setTimeout(() => { statusEl.style.display = 'none'; }, 8000);
         } catch (err) {
           statusEl.style.color = 'var(--red)';
