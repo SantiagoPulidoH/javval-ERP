@@ -2096,9 +2096,14 @@
     <section id="sec-clientes" class="section">
       <h1 class="section-title">Clientes</h1>
       <p class="section-sub">Maestro de clientes — <span id="clientes-count">383</span> registrados</p>
-      <div class="toolbar">
+      <div class="toolbar" style="flex-wrap:wrap;gap:8px">
         <input type="text" class="search-box" placeholder="Buscar cliente..." oninput="filterClientes(this.value)">
         <button class="btn" onclick="openClienteModal()">+ Nuevo Cliente</button>
+        <button class="btn secondary" onclick="exportClientesExcel()" title="Descargar Excel con todos los clientes">📥 Exportar Excel</button>
+        <label class="btn secondary" style="cursor:pointer;margin:0" title="Cargar Excel para actualizar clientes masivamente">
+          📂 Importar Excel
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleClientesImport(this)" id="clientes-import-input">
+        </label>
       </div>
       <div class="table-wrap">
         <table class="data-table">
@@ -2141,6 +2146,11 @@
           <option value="">Todas las categorías</option>
         </select>
         <button class="btn" onclick="openProductoModal()">+ Nuevo Producto</button>
+        <button class="btn secondary" onclick="exportProductosExcel()" title="Descargar Excel con todos los productos">📥 Exportar Excel</button>
+        <label class="btn secondary" style="cursor:pointer;margin:0" title="Cargar Excel para actualizar productos masivamente">
+          📂 Importar Excel
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleProductosImport(this)" id="productos-import-input">
+        </label>
       </div>
       <div class="table-wrap" style="overflow-x:auto">
         <table class="data-table compact" style="min-width:1100px">
@@ -2181,9 +2191,14 @@
     <section id="sec-proveedores" class="section">
       <h1 class="section-title">Proveedores</h1>
       <p class="section-sub">Maestro de proveedores</p>
-      <div class="toolbar">
+      <div class="toolbar" style="flex-wrap:wrap;gap:8px">
         <input type="text" class="search-box" placeholder="Buscar proveedor..." oninput="filterProveedores(this.value)">
         <button class="btn" onclick="openProveedorModal()">+ Nuevo Proveedor</button>
+        <button class="btn secondary" onclick="exportProveedoresExcel()" title="Descargar Excel con todos los proveedores">📥 Exportar Excel</button>
+        <label class="btn secondary" style="cursor:pointer;margin:0" title="Cargar Excel para actualizar proveedores masivamente">
+          📂 Importar Excel
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleProveedoresImport(this)" id="proveedores-import-input">
+        </label>
       </div>
       <div class="table-wrap">
         <table class="data-table">
@@ -5330,6 +5345,279 @@
     }
 
     function filterProveedores(val) { renderProveedores(state.proveedores.filter(p => p.nombre.toUpperCase().includes(val.toUpperCase()))); }
+
+    // ════════════════════════════════════════════
+    // EXPORT / IMPORT EXCEL — CLIENTES
+    // ════════════════════════════════════════════
+    function exportClientesExcel() {
+      if (!state.clientes || state.clientes.length === 0) { toast('No hay clientes para exportar', 'error'); return; }
+      const headers = ['_fbId','id','nombre','categoria','telefono','barrio','direccion','vendedor','nit','credito','activo'];
+      const rows = state.clientes.map(c => [
+        c._fbId || slugify(String(c.nombre || '')),
+        c.id || '',
+        c.nombre || '',
+        c.categoria || '',
+        c.telefono || '',
+        c.barrio || '',
+        c.direccion || '',
+        c.vendedor || '',
+        c.nit || '',
+        c.credito || '',
+        c.activo || 'Sí'
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      // Ancho de columnas
+      ws['!cols'] = [
+        {wch:30},{wch:6},{wch:40},{wch:16},{wch:16},{wch:22},{wch:30},{wch:16},{wch:16},{wch:8},{wch:6}
+      ];
+      // Estilo cabecera (color azul oscuro)
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[addr]) continue;
+        ws[addr].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1e3a5f' } }, alignment: { horizontal: 'center' } };
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'CLIENTES');
+      const fecha = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `Javval_Clientes_${fecha}.xlsx`);
+      toast(`${state.clientes.length} clientes exportados ✓`, 'success');
+    }
+
+    function handleClientesImport(input) {
+      const file = input.files[0];
+      if (!file) return;
+      toast('Procesando Excel de clientes...', 'info');
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          if (!rows.length) { toast('El archivo está vacío', 'error'); return; }
+
+          let updated = 0, created = 0;
+          for (const row of rows) {
+            if (!row.nombre && !row.NOMBRE) continue; // saltar filas vacías
+            const nombre = String(row.nombre || row.NOMBRE || '').trim().toUpperCase();
+            if (!nombre) continue;
+            const fbId = String(row._fbId || row['_fbId'] || '').trim() || slugify(nombre);
+            const record = {
+              _fbId: fbId,
+              id: row.id || row.ID || '',
+              nombre,
+              categoria: String(row.categoria || row.CATEGORIA || '').trim(),
+              telefono: String(row.telefono || row.TELEFONO || '').trim(),
+              barrio: String(row.barrio || row.BARRIO || '').trim(),
+              direccion: String(row.direccion || row.DIRECCION || '').trim(),
+              vendedor: String(row.vendedor || row.VENDEDOR || '').trim(),
+              nit: String(row.nit || row.NIT || '').trim(),
+              credito: String(row.credito || row.CREDITO || 'No').trim(),
+              activo: String(row.activo || row.ACTIVO || 'Sí').trim()
+            };
+            const existIdx = state.clientes.findIndex(c => (c._fbId && c._fbId === fbId) || c.nombre.toUpperCase() === nombre);
+            if (existIdx >= 0) {
+              state.clientes[existIdx] = { ...state.clientes[existIdx], ...record };
+              updated++;
+            } else {
+              state.clientes.push(record);
+              created++;
+            }
+            if (window.FS) await window.FS.set('clientes', fbId, toFS(record));
+          }
+          saveLocal();
+          renderClientes();
+          toast(`Clientes: ${updated} actualizados, ${created} nuevos creados ✓`, 'success');
+        } catch(err) {
+          console.error('handleClientesImport:', err);
+          toast('Error procesando el archivo: ' + err.message, 'error');
+        } finally {
+          input.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ════════════════════════════════════════════
+    // EXPORT / IMPORT EXCEL — PRODUCTOS
+    // ════════════════════════════════════════════
+    function exportProductosExcel() {
+      if (!state.productos || state.productos.length === 0) { toast('No hay productos para exportar', 'error'); return; }
+      const headers = ['_fbId','nombre','unidad','categoria','costo','precio1','precio2','precio3','precio4','ultAct','proveedor'];
+      const rows = state.productos.map(p => [
+        p._fbId || slugify(String(p.nombre || '') + (p.unidad ? '_' + p.unidad : '')),
+        p.nombre || '',
+        p.unidad || '',
+        p.categoria || '',
+        p.costo ? Math.round(p.costo) : 0,
+        p.precio1 ? Math.round(p.precio1) : 0,
+        p.precio2 ? Math.round(p.precio2) : 0,
+        p.precio3 ? Math.round(p.precio3) : 0,
+        p.precio4 ? Math.round(p.precio4) : 0,
+        p.ultAct || '',
+        p.proveedor || ''
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws['!cols'] = [
+        {wch:36},{wch:40},{wch:10},{wch:18},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:28}
+      ];
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[addr]) continue;
+        ws[addr].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1e3a5f' } }, alignment: { horizontal: 'center' } };
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'PRODUCTOS');
+      const fecha = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `Javval_Productos_${fecha}.xlsx`);
+      toast(`${state.productos.length} productos exportados ✓`, 'success');
+    }
+
+    function handleProductosImport(input) {
+      const file = input.files[0];
+      if (!file) return;
+      toast('Procesando Excel de productos...', 'info');
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          if (!rows.length) { toast('El archivo está vacío', 'error'); return; }
+
+          let updated = 0, created = 0;
+          for (const row of rows) {
+            const nombre = String(row.nombre || row.NOMBRE || '').trim().toUpperCase();
+            if (!nombre) continue;
+            const unidad = String(row.unidad || row.UNIDAD || '').trim();
+            const fbId = String(row._fbId || row['_fbId'] || '').trim() || slugify(nombre + (unidad ? '_' + unidad : ''));
+            const record = {
+              _fbId: fbId,
+              nombre,
+              unidad,
+              categoria: String(row.categoria || row.CATEGORIA || '').trim(),
+              costo: parseFloat(String(row.costo || row.COSTO || '0').replace(/\./g,'').replace(',','.')) || 0,
+              precio1: parseFloat(String(row.precio1 || row.PRECIO1 || '0').replace(/\./g,'').replace(',','.')) || 0,
+              precio2: parseFloat(String(row.precio2 || row.PRECIO2 || '0').replace(/\./g,'').replace(',','.')) || 0,
+              precio3: parseFloat(String(row.precio3 || row.PRECIO3 || '0').replace(/\./g,'').replace(',','.')) || 0,
+              precio4: parseFloat(String(row.precio4 || row.PRECIO4 || '0').replace(/\./g,'').replace(',','.')) || 0,
+              ultAct: String(row.ultAct || row.ULTACT || row['ult_act'] || '').trim(),
+              proveedor: String(row.proveedor || row.PROVEEDOR || '').trim().toUpperCase()
+            };
+            const existIdx = state.productos.findIndex(p =>
+              (p._fbId && p._fbId === fbId) ||
+              (p.nombre.toUpperCase() === nombre && p.unidad === unidad)
+            );
+            if (existIdx >= 0) {
+              state.productos[existIdx] = { ...state.productos[existIdx], ...record };
+              updated++;
+            } else {
+              state.productos.push(record);
+              created++;
+            }
+            if (window.FS) await window.FS.set('productos', fbId, toFS(record));
+          }
+          saveLocal();
+          renderProductos();
+          populateCatFilter();
+          toast(`Productos: ${updated} actualizados, ${created} nuevos creados ✓`, 'success');
+        } catch(err) {
+          console.error('handleProductosImport:', err);
+          toast('Error procesando el archivo: ' + err.message, 'error');
+        } finally {
+          input.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ════════════════════════════════════════════
+    // EXPORT / IMPORT EXCEL — PROVEEDORES
+    // ════════════════════════════════════════════
+    function exportProveedoresExcel() {
+      if (!state.proveedores || state.proveedores.length === 0) { toast('No hay proveedores para exportar', 'error'); return; }
+      const headers = ['_fbId','nombre','nit','telefono','condicion','notas','activo'];
+      const rows = state.proveedores.map(p => [
+        p._fbId || slugify(String(p.nombre || '')),
+        p.nombre || '',
+        (p.nit && p.nit !== 'nan') ? p.nit : '',
+        (p.telefono && p.telefono !== 'nan') ? p.telefono : '',
+        p.condicion || 'Contado',
+        (p.notas && p.notas !== 'nan' && p.notas !== '0') ? p.notas : '',
+        p.activo || 'Si'
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws['!cols'] = [
+        {wch:30},{wch:36},{wch:16},{wch:16},{wch:12},{wch:50},{wch:6}
+      ];
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[addr]) continue;
+        ws[addr].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1e3a5f' } }, alignment: { horizontal: 'center' } };
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'PROVEEDORES');
+      const fecha = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `Javval_Proveedores_${fecha}.xlsx`);
+      toast(`${state.proveedores.length} proveedores exportados ✓`, 'success');
+    }
+
+    function handleProveedoresImport(input) {
+      const file = input.files[0];
+      if (!file) return;
+      toast('Procesando Excel de proveedores...', 'info');
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          if (!rows.length) { toast('El archivo está vacío', 'error'); return; }
+
+          let updated = 0, created = 0;
+          for (const row of rows) {
+            const nombre = String(row.nombre || row.NOMBRE || '').trim().toUpperCase();
+            if (!nombre) continue;
+            const fbId = String(row._fbId || row['_fbId'] || '').trim() || slugify(nombre);
+            const record = {
+              _fbId: fbId,
+              nombre,
+              nit: String(row.nit || row.NIT || '').trim(),
+              telefono: String(row.telefono || row.TELEFONO || '').trim(),
+              condicion: String(row.condicion || row.CONDICION || 'Contado').trim(),
+              notas: String(row.notas || row.NOTAS || '').trim(),
+              activo: String(row.activo || row.ACTIVO || 'Si').trim()
+            };
+            const existIdx = state.proveedores.findIndex(p =>
+              (p._fbId && p._fbId === fbId) ||
+              p.nombre.toUpperCase() === nombre
+            );
+            if (existIdx >= 0) {
+              state.proveedores[existIdx] = { ...state.proveedores[existIdx], ...record };
+              updated++;
+            } else {
+              state.proveedores.push(record);
+              created++;
+            }
+            if (window.FS) await window.FS.set('proveedores', fbId, toFS(record));
+          }
+          saveLocal();
+          renderProveedores();
+          toast(`Proveedores: ${updated} actualizados, ${created} nuevos creados ✓`, 'success');
+        } catch(err) {
+          console.error('handleProveedoresImport:', err);
+          toast('Error procesando el archivo: ' + err.message, 'error');
+        } finally {
+          input.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
 
     // ════════════════════════════════════════════
     // DASHBOARD
