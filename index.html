@@ -2369,6 +2369,7 @@
           </label>
           <button class="btn secondary" onclick="exportPDFFlujo()" title="Exportar reporte PDF del mes actual">🖨
             PDF</button>
+          <button class="btn secondary" style="color:var(--accent);border-color:var(--accent)" onclick="forzarSincronizacion()" title="Recarga todos los datos desde Firebase (descarta cache local)">🔄 Forzar Sync</button>
           <button class="btn secondary" style="color:var(--red);border-color:var(--red)" onclick="deleteFlujoMes()" title="Eliminar todos los registros del mes actual (ambas cuentas)">🗑️ Eliminar mes</button>
           <button class="btn" onclick="openFlujoModal()">+ Nuevo Movimiento</button>
         </div>
@@ -4311,15 +4312,14 @@
       }).catch(() => {});
 
       function applyDocs(key, docs, renderFn) {
-        if (!docs.length) return;
         if (key === 'ventas' && window._ventasListenerPaused) return;
         // Sort by _ts desc (newest first) since we removed orderBy from listener
-        docs.sort((a, b) => {
+        (docs || []).sort((a, b) => {
           const ta = typeof a._ts === 'number' ? a._ts : 0;
           const tb = typeof b._ts === 'number' ? b._ts : 0;
           return tb - ta;
         });
-        state[key] = docs;
+        state[key] = docs || [];
         saveLocal();
         try { renderFn?.(); } catch (e) {}
         updateBadges();
@@ -6564,8 +6564,14 @@
 
     function saveSaldoInicial() {
       const val = parseFloat(document.getElementById('flujo-saldo-inicial').value) || 0;
-      state.saldosIni[`${currentFlujoMes}_${currentFlujoCuenta}`] = val;
+      const key = `${currentFlujoMes}_${currentFlujoCuenta}`;
+      state.saldosIni[key] = val;
       saveFlujoLocal();
+      // Sync to Firebase so other browsers see it
+      if (window.FS) {
+        window.FS.db.ref(`javval/config/saldosIni/${key}`).set(val)
+          .catch(e => console.warn('saldosIni sync:', e));
+      }
       renderFlujo();
     }
 
@@ -6735,6 +6741,44 @@
           }
         });
     }
+    function forzarSincronizacion() {
+      if (!confirm('¿Forzar sincronización?\n\nEsto descarta el cache local y recarga TODO desde Firebase.\nUsa esto si los datos se ven diferentes en otro browser/celular.')) return;
+      if (!window.FS) { toast('Sin conexión a Firebase', 'error'); return; }
+
+      toast('🔄 Limpiando cache local y recargando desde Firebase...', 'info');
+
+      // Wipe localStorage flujo data so Firebase wins
+      ['jv_flujo','jv_saldosini','jv_entregas','jv_cxpagar','jv_nequiextr'].forEach(k => {
+        try { localStorage.removeItem(k); } catch(e) {}
+      });
+
+      // Reset in-memory state for these collections
+      state.flujo = [];
+      state.saldosIni = {};
+      state.entregas = [];
+      state.cxpagar = [];
+
+      // Re-pull from Firebase
+      Promise.all([
+        window.FS.db.ref('javval/config/saldosIni').get().then(s => {
+          state.saldosIni = s.exists() ? (s.val() || {}) : {};
+        }),
+        window.FS.getAll('flujo_caja').then(d => { state.flujo = d || []; }),
+        window.FS.getAll('entregas_cxc').then(d => { state.entregas = d || []; }),
+        window.FS.getAll('cuentas_pagar').then(d => { state.cxpagar = d || []; }),
+      ]).then(() => {
+        saveFlujoLocal();
+        renderFlujo();
+        renderEntregas?.();
+        renderCXPagar?.();
+        updateBadges();
+        toast(`✓ Sincronizado — ${state.flujo.length} flujo, ${state.entregas.length} entregas, ${state.cxpagar.length} CXP, ${Object.keys(state.saldosIni).length} saldos`, 'success');
+      }).catch(e => {
+        console.error('forzarSincronizacion:', e);
+        toast(`Error sincronizando: ${e.message}`, 'error');
+      });
+    }
+
     function deleteFlujoMov(id) {
       if (!confirm('¿Eliminar este movimiento?')) return;
       const rec = state.flujo.find(f => f.id === id);
@@ -6810,38 +6854,49 @@
     function startFlujoListeners() {
       if (!window.FS) return;
 
-      // Load flujo_caja from Firebase on startup (getAll for instant load)
-      window.FS.getAll('flujo_caja').then(docs => {
-        if (docs.length > 0) {
-          state.flujo = docs;
+      // Load saldosIni from Firebase first (it's the source of truth across browsers)
+      window.FS.db.ref('javval/config/saldosIni').get().then(snap => {
+        if (snap.exists()) {
+          state.saldosIni = snap.val() || {};
           saveFlujoLocal();
           renderFlujo();
-          updateBadges();
         }
+      }).catch(e => console.warn('getSaldosIni:', e));
+
+      // Listen for saldosIni changes from any browser
+      window.FS.db.ref('javval/config/saldosIni').on('value', snap => {
+        if (window._flujoImportando) return;
+        state.saldosIni = snap.exists() ? (snap.val() || {}) : {};
+        saveFlujoLocal();
+        renderFlujo();
+      });
+
+      // Load flujo_caja from Firebase on startup — ALWAYS apply, even if empty
+      // (empty result means everything was deleted from another browser)
+      window.FS.getAll('flujo_caja').then(docs => {
+        state.flujo = docs;
+        saveFlujoLocal();
+        renderFlujo();
+        updateBadges();
       }).catch(e => console.warn('getAll flujo:', e));
 
-      // Real-time listeners for ongoing updates
+      // Real-time listener — also applies empty results (key fix for cross-browser sync)
       window.FS.listen('flujo_caja', docs => {
-        if (docs.length > 0 && !window._flujoImportando) {
-          state.flujo = docs;
-          saveFlujoLocal();
-          renderFlujo();
-          updateBadges();
-        }
+        if (window._flujoImportando) return;
+        state.flujo = docs;
+        saveFlujoLocal();
+        renderFlujo();
+        updateBadges();
       }, '_ts');
       window.FS.listen('entregas_cxc', docs => {
-        if (docs.length > 0) {
-          state.entregas = docs;
-          saveFlujoLocal();
-          renderEntregas();
-        }
+        state.entregas = docs;
+        saveFlujoLocal();
+        renderEntregas();
       }, '_ts');
       window.FS.listen('cuentas_pagar', docs => {
-        if (docs.length > 0) {
-          state.cxpagar = docs;
-          saveFlujoLocal();
-          renderCXPagar();
-        }
+        state.cxpagar = docs;
+        saveFlujoLocal();
+        renderCXPagar();
       }, '_ts');
     }
 
@@ -7934,7 +7989,13 @@
           });
           result.saldosIni.forEach(s => {
             const key = `${s.mes}_${s.cuenta}`;
-            if (!state.saldosIni[key]) state.saldosIni[key] = s.valor;
+            // Always update from Excel (overrides previous value)
+            state.saldosIni[key] = s.valor;
+            // Sync to Firebase so other browsers see it
+            if (window.FS) {
+              window.FS.db.ref(`javval/config/saldosIni/${key}`).set(s.valor)
+                .catch(e => console.warn('saldoIni Firebase sync:', e));
+            }
           });
           saveFlujoLocal();
           // Upload ALL movements to Firebase using stable docId (set = upsert, no duplicates)
