@@ -7859,19 +7859,13 @@
           }
           let added = 0, updated = 0;
           result.movimientos.forEach(mov => {
-            // Generate stable docId — same formula used on write, so re-import hits same key
-            const docId = mov.mes + '_' + mov.cuenta + '_' + String(mov.dia).padStart(2,'0') + '_' + (mov.rubro||'').replace(/[^a-z0-9]/gi,'_').slice(0,30);
-            mov.id   = docId;
-            mov._fbId = docId;
+            // parseFlujoWorkbook already set stable mov.id and mov._fbId with counter suffix
+            // e.g. "2026-03_caja_02_RUTA_JAVIER_01", "2026-03_caja_02_RUTA_JAVIER_02"...
+            const docId = mov._fbId || mov.id;
 
-            // Upsert in state.flujo — match by docId (tolerates type mismatches from Firebase)
+            // Upsert in state.flujo by docId (exact match, no type mismatch issues)
             const existIdx = state.flujo.findIndex(f =>
-              (f._fbId && f._fbId === docId) ||
-              (f.id    && f.id    === docId) ||
-              (String(f.mes) === String(mov.mes) &&
-               String(f.cuenta) === String(mov.cuenta) &&
-               String(f.dia) === String(mov.dia) &&
-               String(f.rubro||'').trim().toUpperCase() === String(mov.rubro||'').trim().toUpperCase())
+              (f._fbId && f._fbId === docId) || (f.id && f.id === docId)
             );
             if (existIdx >= 0) {
               state.flujo[existIdx] = { ...state.flujo[existIdx], ...mov };
@@ -7996,6 +7990,10 @@
         const saldoIni = parseFloat(rows[3]?.[10]) || 0;
         saldosIni.push({ mes, cuenta, valor: saldoIni });
 
+        // Counter map: tracks how many times each dia+rubro combo has appeared
+        // This generates stable IDs even when the same rubro appears multiple times on the same day
+        const diaRubroCounter = {};
+
         // Data rows start at index 4 (5th Excel row onwards)
         for (let i = 4; i < rows.length; i++) {
           const row = rows[i];
@@ -8035,8 +8033,16 @@
             col = amounts.reduce((a, b) => b[1] > a[1] ? b : a, ['gastos', 0])[0];
           }
 
+          // Stable docId: mes_cuenta_dia_rubro_seq (seq handles multiple same-rubro rows on same day)
+          const rubroKey = rubro.replace(/[^a-z0-9]/gi, '_').slice(0, 30);
+          const baseKey = `${mes}_${cuenta}_${String(dia).padStart(2,'0')}_${rubroKey}`;
+          diaRubroCounter[baseKey] = (diaRubroCounter[baseKey] || 0) + 1;
+          const seqSuffix = String(diaRubroCounter[baseKey]).padStart(2, '0');
+          const stableId = `${baseKey}_${seqSuffix}`;
+
           movimientos.push({
-            id: genId(),
+            id: stableId,
+            _fbId: stableId,
             mes, cuenta, dia, rubro, col, detalle,
             ingOp, ingOtros, gastos, compras, proveedores, provisiones, creditos,
             compraItems: [],
