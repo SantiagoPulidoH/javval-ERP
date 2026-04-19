@@ -2263,6 +2263,12 @@
         <button class="inv-filter-btn" id="inv-f-low" onclick="setInvFilter('low')">🟡 Bajo</button>
         <button class="inv-filter-btn" id="inv-f-zero" onclick="setInvFilter('zero')">🔴 Agotado</button>
         <button class="btn" onclick="openAjusteModal()">+ Ajuste Manual</button>
+        <button class="btn secondary" onclick="exportInventarioExcel()" title="Descargar Excel con stock actual + columna para cuadre físico">📥 Exportar Excel</button>
+        <label class="btn secondary" style="cursor:pointer;margin:0" title="Cargar Excel de cuadre físico — crea ajustes automáticos por diferencia">
+          📂 Cuadre Físico
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleCuadreInventarioImport(this)" id="inv-cuadre-input">
+        </label>
+        <button class="btn secondary" style="color:var(--red);border-color:var(--red)" onclick="cierreInventario()" title="Crea ajustes para llevar todo el inventario a 0 (cierre de período)">🔄 Cierre Inventario</button>
       </div>
 
       <!-- Stock table -->
@@ -4209,7 +4215,7 @@
       entregas:    JSON.parse(localStorage.getItem('jv_entregas')    || '[]'),
       cxpagar:     JSON.parse(localStorage.getItem('jv_cxpagar')     || '[]'),
       nequiExtr:   JSON.parse(localStorage.getItem('jv_nequiextr')   || '{}'),
-      ajustes:     JSON.parse(localStorage.getItem('jv_ajustes')     || '[]'),
+      ajustes:     [],  // Loaded from Firebase in loadAjustesFromFirestore()
       stockMins:   JSON.parse(localStorage.getItem('jv_stockmins')   || '{}'),
     };
 
@@ -7193,9 +7199,8 @@
 
       const ajuste = { id: genId(), producto, unidad, tipo, cantidad, fecha, motivo, nota, createdAt: new Date().toISOString() };
       state.ajustes.unshift(ajuste);
-      localStorage.setItem('jv_ajustes', JSON.stringify(state.ajustes));
+      // Sync to Firebase only — no localStorage
 
-      // Sync to Firestore
       if (window.FS) {
         try { await window.FS.add('ajustes_inventario', ajuste); } catch (e) { console.warn('ajuste sync:', e); }
       }
@@ -7206,18 +7211,190 @@
       toast(`Ajuste guardado ✓ — ${tipo === 'entrada' ? '+' : '-'}${cantidad} ${unidad} de ${producto}`, 'success');
     }
 
+    // ════════════════════════════════════════════
+    // INVENTARIO — EXPORT / CUADRE FÍSICO / CIERRE
+    // ════════════════════════════════════════════
+
+    function exportInventarioExcel() {
+      const allStock = calcStock();
+      if (!allStock.length) { toast('No hay productos en inventario', 'error'); return; }
+
+      const headers = [
+        'producto', 'unidad', 'entradas', 'salidas', 'ajustes_netos',
+        'stock_actual', 'stock_minimo', 'stock_contado'
+      ];
+      const nota = ['← NO editar', '← NO editar', '← NO editar', '← NO editar',
+        '← NO editar', '← NO editar', '← NO editar', '← Ingresa cantidad contada físicamente'];
+
+      const rows = allStock.map(s => [
+        s.nombre,
+        s.unidad,
+        s.entradas,
+        s.salidas,
+        +(s.ajustePos - s.ajusteNeg).toFixed(2),
+        +s.stock.toFixed(2),
+        s.min || 0,
+        '' // stock_contado — filled by user
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, nota, ...rows]);
+      ws['!cols'] = [
+        {wch:40},{wch:12},{wch:10},{wch:10},{wch:14},{wch:14},{wch:14},{wch:22}
+      ];
+
+      // Style header row
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (ws[addr]) ws[addr].s = {
+          font: { bold: true, color: { rgb: 'FFFFFF' } },
+          fill: { fgColor: { rgb: '1e3a5f' } },
+          alignment: { horizontal: 'center' }
+        };
+      }
+      // Highlight stock_contado column (H) in yellow on all data rows
+      for (let R = 2; R <= range.e.r; R++) {
+        const addr = XLSX.utils.encode_cell({ r: R, c: 7 });
+        if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+        ws[addr].s = { fill: { fgColor: { rgb: 'FFF9C4' } }, font: { bold: true } };
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'INVENTARIO');
+      const fecha = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Javval_Inventario_${fecha}.xlsx`);
+      toast(`${allStock.length} productos exportados — llena la columna stock_contado y reimporta ✓`, 'success');
+    }
+
+    async function handleCuadreInventarioImport(input) {
+      const file = input.files[0];
+      if (!file) return;
+      input.value = '';
+      toast('Procesando cuadre físico...', 'info');
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          if (!rows.length) { toast('Archivo vacío', 'error'); return; }
+
+          const fecha = new Date().toISOString().slice(0, 10);
+          const ajustesNuevos = [];
+
+          for (const row of rows) {
+            // Skip instruction/header rows
+            const producto = String(row.producto || row.PRODUCTO || '').trim().toUpperCase();
+            if (!producto || producto === 'PRODUCTO' || producto.startsWith('←')) continue;
+
+            const stockContado = parseFloat(String(row.stock_contado || row.STOCK_CONTADO || '').replace(/[^0-9.,-]/g,'').replace(',','.'));
+            if (isNaN(stockContado) || String(row.stock_contado || '').trim() === '') continue; // skip blanks
+
+            const stockActual = parseFloat(String(row.stock_actual || row.STOCK_ACTUAL || '0').replace(/[^0-9.,-]/g,'').replace(',','.')) || 0;
+            const diferencia = +(stockContado - stockActual).toFixed(4);
+            if (Math.abs(diferencia) < 0.001) continue; // no change needed
+
+            const unidad = String(row.unidad || row.UNIDAD || '').trim();
+            const aj = {
+              id: genId(),
+              producto,
+              unidad,
+              tipo: diferencia > 0 ? 'entrada' : 'salida',
+              cantidad: Math.abs(diferencia),
+              fecha,
+              motivo: 'CUADRE FÍSICO',
+              nota: `Contado: ${stockContado} | Sistema: ${stockActual} | Dif: ${diferencia > 0 ? '+' : ''}${diferencia}`,
+              createdAt: new Date().toISOString()
+            };
+            ajustesNuevos.push(aj);
+          }
+
+          if (!ajustesNuevos.length) {
+            toast('No hay diferencias entre el conteo físico y el sistema — inventario cuadrado ✓', 'success');
+            return;
+          }
+
+          // Save all to Firebase
+          let saved = 0;
+          for (const aj of ajustesNuevos) {
+            state.ajustes.unshift(aj);
+            if (window.FS) {
+              await window.FS.add('ajustes_inventario', aj)
+                .then(() => saved++)
+                .catch(err => console.warn('cuadre ajuste:', err));
+            } else {
+              saved++;
+            }
+          }
+
+          renderInventario();
+          renderMovimientos();
+          toast(`Cuadre completado — ${saved} ajustes creados en Firebase ✓`, 'success');
+        } catch(err) {
+          console.error('handleCuadreInventarioImport:', err);
+          toast('Error procesando cuadre: ' + err.message, 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function cierreInventario() {
+      const allStock = calcStock();
+      const conStock = allStock.filter(s => Math.abs(s.stock) > 0.001);
+
+      if (!conStock.length) {
+        toast('Todo el inventario ya está en 0 — nada que cerrar', 'info');
+        return;
+      }
+
+      const fecha = new Date().toISOString().slice(0, 10);
+      if (!confirm(
+        `CIERRE DE INVENTARIO — ${fecha}\n\n` +
+        `Se crearán ${conStock.length} ajustes para llevar todo el stock a 0.\n\n` +
+        `Esto registra el cierre del período en Firebase con trazabilidad completa.\n` +
+        `¿Confirmar?`
+      )) return;
+
+      toast(`Creando ${conStock.length} ajustes de cierre...`, 'info');
+
+      let ok = 0;
+      for (const s of conStock) {
+        const aj = {
+          id: genId(),
+          producto: s.nombre,
+          unidad: s.unidad,
+          tipo: s.stock > 0 ? 'salida' : 'entrada',
+          cantidad: Math.abs(s.stock),
+          fecha,
+          motivo: 'CIERRE DE INVENTARIO',
+          nota: `Stock previo al cierre: ${s.stock}`,
+          createdAt: new Date().toISOString()
+        };
+        state.ajustes.unshift(aj);
+        if (window.FS) {
+          await window.FS.add('ajustes_inventario', aj)
+            .then(() => ok++)
+            .catch(err => console.warn('cierre ajuste:', err));
+        } else {
+          ok++;
+        }
+      }
+
+      renderInventario();
+      renderMovimientos();
+      toast(`Cierre completado — ${ok} ajustes guardados en Firebase ✓`, 'success');
+    }
+
     // ── Load ajustes from Firestore on startup ──────────────────────────
     async function loadAjustesFromFirestore() {
       if (!window.FS) return;
       try {
         const docs = await window.FS.getAll('ajustes_inventario');
-        if (docs.length > 0) {
-          state.ajustes = docs;
-          localStorage.setItem('jv_ajustes', JSON.stringify(state.ajustes));
-        }
-        // Also load stockMins config
-        const cfg = await window.FS.db
-          ? null : null; // handled via listen below
+        // Always apply result from Firebase (even empty — means no adjustments exist)
+        state.ajustes = docs.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+        renderInventario();
+        renderMovimientos();
       } catch (e) { console.warn('loadAjustes:', e); }
     }
 
@@ -7225,12 +7402,10 @@
     function listenAjustes() {
       if (!window.FS) return;
       window.FS.listen('ajustes_inventario', docs => {
-        if (docs.length > 0) {
-          state.ajustes = docs.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
-          localStorage.setItem('jv_ajustes', JSON.stringify(state.ajustes));
-          renderInventario();
-          renderMovimientos();
-        }
+        // Always apply — empty means all adjustments were deleted
+        state.ajustes = (docs || []).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+        renderInventario();
+        renderMovimientos();
       });
     }
 
