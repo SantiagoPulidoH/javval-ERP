@@ -6660,46 +6660,71 @@
 
     function deleteFlujoMes() {
       const mesNombre = mesLabel(currentFlujoMes);
+      const mes = currentFlujoMes;
       if (!confirm(`¿Eliminar TODOS los movimientos de ${mesNombre}?\n\nEsto borra Caja + Nequi del mes en Firebase y en el sistema local.\nDespués podrás volver a importar el Excel sin duplicados.`)) return;
 
-      // Step 1: delete from local state immediately
-      const localCount = state.flujo.filter(f => f.mes === currentFlujoMes).length;
-      state.flujo = state.flujo.filter(f => f.mes !== currentFlujoMes);
+      // Suppress the real-time listener so it doesn't restore data while we delete
+      window._flujoImportando = true;
+
+      // Collect IDs from local state
+      const localIds = state.flujo
+        .filter(f => f.mes === mes)
+        .map(f => f._fbId || f.id)
+        .filter(Boolean);
+
+      // Remove from local state immediately
+      state.flujo = state.flujo.filter(f => f.mes !== mes);
       saveFlujoLocal();
       renderFlujo();
       updateBadges();
 
-      // Step 2: query Firebase DIRECTLY by mes field to catch ALL records,
-      // including orphans with old IDs that never made it into local state
-      if (window.FS) {
-        toast(`Limpiando ${mesNombre} en Firebase...`, 'info');
-        window.FS.db.ref('javval/flujo_caja')
-          .orderByChild('mes')
-          .equalTo(currentFlujoMes)
-          .once('value')
-          .then(snap => {
-            const allKeys = [];
-            snap.forEach(child => allKeys.push(child.key));
-            if (allKeys.length === 0) {
-              toast(`${mesNombre} limpiado (${localCount} locales eliminados) ✓`, 'success');
-              return;
-            }
-            // Batch delete all matched keys
-            const updates = {};
-            allKeys.forEach(k => { updates[`javval/flujo_caja/${k}`] = null; });
-            return window.FS.db.ref().update(updates).then(() => {
-              toast(`${mesNombre} eliminado — ${allKeys.length} registros borrados de Firebase ✓`, 'success');
-            });
-          })
-          .catch(e => {
-            console.warn('deleteFlujoMes Firebase query:', e);
-            toast(`Local limpiado (${localCount} registros). Error al limpiar Firebase: ${e.message}`, 'error');
-          });
-      } else {
-        toast(`${localCount} registros de ${mesNombre} eliminados localmente ✓`, 'success');
+      if (!window.FS) {
+        window._flujoImportando = false;
+        toast(`${localIds.length} registros de ${mesNombre} eliminados localmente ✓`, 'success');
+        return;
       }
-    }
 
+      toast(`Limpiando ${mesNombre} en Firebase...`, 'info');
+
+      // Also query Firebase to catch orphan records with old IDs not in local state
+      window.FS.db.ref('javval/flujo_caja')
+        .orderByChild('mes').equalTo(mes)
+        .once('value')
+        .then(snap => {
+          const fbKeys = [];
+          snap.forEach(child => fbKeys.push(child.key));
+          const allKeys = [...new Set([...localIds, ...fbKeys])];
+
+          if (allKeys.length === 0) {
+            window._flujoImportando = false;
+            toast(`${mesNombre} ya estaba vacío ✓`, 'info');
+            return;
+          }
+
+          // Single batch delete
+          const updates = {};
+          allKeys.forEach(k => { updates[`javval/flujo_caja/${k}`] = null; });
+          return window.FS.db.ref().update(updates).then(() => {
+            window._flujoImportando = false;
+            toast(`${mesNombre} eliminado — ${allKeys.length} registros borrados de Firebase ✓`, 'success');
+          });
+        })
+        .catch(e => {
+          // Fallback: delete by local IDs only
+          console.warn('deleteFlujoMes query fallback:', e);
+          if (localIds.length > 0) {
+            const updates = {};
+            localIds.forEach(k => { updates[`javval/flujo_caja/${k}`] = null; });
+            window.FS.db.ref().update(updates)
+              .then(() => { toast(`${mesNombre} eliminado — ${localIds.length} registros borrados ✓`, 'success'); })
+              .catch(e2 => { toast(`Error al borrar en Firebase: ${e2.message}`, 'error'); })
+              .finally(() => { window._flujoImportando = false; });
+          } else {
+            window._flujoImportando = false;
+            toast(`Local limpiado. Error Firebase: ${e.message}`, 'error');
+          }
+        });
+    }
     function deleteFlujoMov(id) {
       if (!confirm('¿Eliminar este movimiento?')) return;
       const rec = state.flujo.find(f => f.id === id);
