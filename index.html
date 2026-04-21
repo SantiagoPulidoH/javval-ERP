@@ -2500,6 +2500,7 @@
           📂 Cargar Excel
           <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleCXCImport(this)">
         </label>
+        <button class="btn secondary" style="color:var(--red);border-color:var(--red)" onclick="deleteAllEntregas()" title="Eliminar TODOS los registros de Entregas y Cobros de Firebase">🗑️ Eliminar Todo</button>
         <button class="btn" onclick="openEntregaModal()">+ Agregar CXC</button>
       </div>
       <div id="cxc-import-status" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:12px;font-family:var(--mono)"></div>
@@ -6794,6 +6795,68 @@
       renderFlujo();
       updateBadges();
       toast('Movimiento eliminado', 'info');
+    }
+
+    function deleteAllEntregas() {
+      const total = state.entregas.length;
+      if (total === 0) { toast('No hay registros en Entregas y Cobros', 'info'); return; }
+      if (!confirm(
+        `¿Eliminar TODOS los registros de Entregas y Cobros?\n\n` +
+        `Se borrarán ${total} registros de Firebase.\n` +
+        `Después podrás ingresar los cobros pendientes manualmente.`
+      )) return;
+
+      if (!window.FS) {
+        state.entregas = [];
+        saveFlujoLocal();
+        renderEntregas();
+        updateBadges();
+        toast('Registros eliminados localmente (sin Firebase)', 'info');
+        return;
+      }
+
+      toast('Eliminando registros de Firebase...', 'info');
+
+      // Collect all IDs from local state + scan Firebase directly (same pattern as deleteFlujoMes)
+      const localIds = state.entregas.map(e => e._fbId || e.id).filter(Boolean);
+
+      // Clear local state immediately
+      state.entregas = [];
+      saveFlujoLocal();
+      renderEntregas();
+      updateBadges();
+
+      // Full Firebase scan to catch any orphan records
+      window.FS.db.ref('javval/entregas_cxc').once('value')
+        .then(snap => {
+          const toDelete = new Set(localIds);
+          snap.forEach(child => toDelete.add(child.key));
+
+          if (toDelete.size === 0) {
+            toast('Entregas ya estaban vacías en Firebase ✓', 'info');
+            return;
+          }
+
+          const updates = {};
+          toDelete.forEach(k => { updates[`javval/entregas_cxc/${k}`] = null; });
+
+          return window.FS.db.ref().update(updates).then(() => {
+            toast(`Entregas eliminadas — ${toDelete.size} registros borrados de Firebase ✓`, 'success');
+          });
+        })
+        .catch(e => {
+          console.error('deleteAllEntregas:', e);
+          // Fallback: delete only known IDs
+          if (localIds.length > 0) {
+            const updates = {};
+            localIds.forEach(k => { updates[`javval/entregas_cxc/${k}`] = null; });
+            window.FS.db.ref().update(updates)
+              .then(() => toast(`${localIds.length} registros borrados ✓`, 'success'))
+              .catch(e2 => toast(`Error Firebase: ${e2.message}`, 'error'));
+          } else {
+            toast('Local limpiado. Error Firebase: ' + e.message, 'error');
+          }
+        });
     }
 
     function checkNequiMatch() {
