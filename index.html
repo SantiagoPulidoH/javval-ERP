@@ -2151,6 +2151,7 @@
           📂 Importar Excel
           <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleProductosImport(this)" id="productos-import-input">
         </label>
+        <button class="btn secondary" style="color:var(--red);border-color:var(--red)" onclick="deleteAllProductos()" title="Eliminar TODOS los productos de Firebase">🗑️ Eliminar Todo</button>
       </div>
       <div class="table-wrap" style="overflow-x:auto">
         <table class="data-table compact" style="min-width:1100px">
@@ -5353,6 +5354,56 @@
     }
 
     function filterProveedores(val) { renderProveedores(state.proveedores.filter(p => p.nombre.toUpperCase().includes(val.toUpperCase()))); }
+
+    function deleteAllProductos() {
+      const total = state.productos.length;
+      if (total === 0) { toast('No hay productos para eliminar', 'info'); return; }
+      if (!confirm(
+        `¿Eliminar TODOS los productos?\n\n` +
+        `Se borrarán ${total} productos de Firebase.\n` +
+        `Después podrás cargarlos nuevamente con el Excel actualizado.`
+      )) return;
+
+      if (!window.FS) {
+        state.productos = [];
+        saveLocal();
+        renderProductos();
+        updateBadges();
+        toast('Productos eliminados localmente (sin Firebase)', 'info');
+        return;
+      }
+
+      toast('Eliminando productos de Firebase...', 'info');
+      const localIds = state.productos.map(p => p._fbId).filter(Boolean);
+
+      state.productos = [];
+      saveLocal();
+      renderProductos();
+      updateBadges();
+
+      window.FS.db.ref('javval/productos').once('value')
+        .then(snap => {
+          const toDelete = new Set(localIds);
+          snap.forEach(child => toDelete.add(child.key));
+          if (toDelete.size === 0) { toast('Productos ya estaban vacíos en Firebase ✓', 'info'); return; }
+          const updates = {};
+          toDelete.forEach(k => { updates[`javval/productos/${k}`] = null; });
+          return window.FS.db.ref().update(updates).then(() => {
+            toast(`${toDelete.size} productos eliminados de Firebase ✓`, 'success');
+          });
+        })
+        .catch(e => {
+          if (localIds.length > 0) {
+            const updates = {};
+            localIds.forEach(k => { updates[`javval/productos/${k}`] = null; });
+            window.FS.db.ref().update(updates)
+              .then(() => toast(`${localIds.length} productos eliminados ✓`, 'success'))
+              .catch(e2 => toast(`Error Firebase: ${e2.message}`, 'error'));
+          } else {
+            toast('Error Firebase: ' + e.message, 'error');
+          }
+        });
+    }
 
     // ════════════════════════════════════════════
     // EXPORT / IMPORT EXCEL — CLIENTES
