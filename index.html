@@ -7976,19 +7976,15 @@
     }
 
     function onFlujoAbonoChange() {
-      // Abono is the value that actually impacts the flujo/saldo
+      // En compras, el abono ES lo que impacta el saldo (lo que registra saveFlujoMovimiento en amounts[col]).
+      // fl-valor se mantiene sincronizado visualmente para consistencia con el input original,
+      // pero el impacto mostrado se calcula leyendo fl-abono directo desde onFlujoValorChange (sin recursión).
       const abono = parseFloat(document.getElementById('fl-abono').value) || 0;
       const valInput = document.getElementById('fl-valor');
       if (valInput && !valInput.disabled) {
         valInput.value = Math.round(abono);
-        const impEl  = document.getElementById('fl-impacto');
-        const impCol = document.getElementById('fl-impacto-col');
-        if (impEl) {
-          impEl.textContent = abono > 0 ? '-' + fmt(abono) : '—';
-          impEl.style.color = abono > 0 ? 'var(--red)' : 'var(--text2)';
-        }
-        if (impCol) impCol.textContent = 'Compras';
       }
+      onFlujoValorChange();   // refresca fl-impacto leyendo fl-abono en modo compras
       recalcPendiente();
     }
 
@@ -8042,28 +8038,29 @@
 
     function onFlujoValorChange() {
       const col = document.getElementById('fl-col-actual').value;
-      const val = parseFloat(document.getElementById('fl-valor').value) || 0;
       const meta = COL_META[col] || { tipo: 'egreso', color: 'var(--text)', label: col };
+
+      // En compras, el impacto real en saldo = abono (lo que saveFlujoMovimiento registra en amounts[col]).
+      // En cualquier otro rubro, el impacto = valor ingresado en fl-valor.
+      // Esto elimina la recursión infinita (v55 hacía onFlujoValorChange dentro de sí misma) y
+      // garantiza que el display "Impacto en saldo" siempre coincida con lo que realmente se guarda.
+      const val = col === 'compras'
+        ? (parseFloat(document.getElementById('fl-abono')?.value) || 0)
+        : (parseFloat(document.getElementById('fl-valor')?.value) || 0);
+
       const impact = meta.tipo === 'ingreso' ? val : -val;
       const el = document.getElementById('fl-impacto');
       const elCol = document.getElementById('fl-impacto-col');
       if (el) {
-        el.textContent = (impact >= 0 ? '+' : '') + fmt(impact);
-        el.style.color = impact >= 0 ? 'var(--green)' : 'var(--red)';
-      }
-      if (elCol) elCol.textContent = meta.label;
-
-      // Auto-sync compra total to valor field if editing product lines
-      if (col === 'compras') {
-        let total = 0;
-        document.querySelectorAll('[id^="fci-sub-"]').forEach(s => {
-          total += parseFloat(s.textContent.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
-        });
-        if (total > 0) {
-          document.getElementById('fl-valor').value = total;
-          onFlujoValorChange();
+        if (val > 0) {
+          el.textContent = (impact >= 0 ? '+' : '') + fmt(impact);
+          el.style.color = impact >= 0 ? 'var(--green)' : 'var(--red)';
+        } else {
+          el.textContent = '—';
+          el.style.color = 'var(--text2)';
         }
       }
+      if (elCol) elCol.textContent = meta.label;
     }
 
     // ── Override updateFlujoTotal (old multi-field version not needed) ───
