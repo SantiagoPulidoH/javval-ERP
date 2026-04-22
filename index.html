@@ -4387,6 +4387,12 @@
       const decimals = (Math.abs(num) < 1 && num !== 0) ? 2 : 0;
       return num.toLocaleString('es-CO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     }
+    // Format quantity: show up to 2 decimals only if non-integer (e.g. 2.30, 2.58 for weighted products)
+    function fmtCant(n) {
+      const num = Number(n || 0);
+      const isInt = Number.isInteger(num);
+      return num.toLocaleString('es-CO', { minimumFractionDigits: isInt ? 0 : 2, maximumFractionDigits: 2 });
+    }
     // Parse COP-formatted string back to number
     // "$127.200" → 127200 | "$3.600" → 3600 | "$0,50" → 0.5
     function parseCOP(str) {
@@ -4942,7 +4948,20 @@
       doc.setFont('helvetica', 'normal');
       doc.text(v.condicion || '', W / 2 + 22, y);
       doc.line(W / 2 + 20, y + 1, mr, y + 1);
-      y += 10;
+      y += 7;
+
+      // ── OBSERVACIÓN (only render if present)
+      if (v.obs && v.obs.trim()) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('OBSERVACIÓN', ml, y);
+        doc.setFont('helvetica', 'normal');
+        // truncate visually long obs to fit one line
+        const obsTxt = String(v.obs).slice(0, 130);
+        doc.text(obsTxt, ml + 28, y);
+        doc.line(ml + 26, y + 1, mr, y + 1);
+        y += 7;
+      }
+      y += 3;
 
       // ── TABLE HEADER
       // vunit right edge at mr-16, vtotal right edge at mr
@@ -4971,7 +4990,7 @@
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       v.items.forEach(item => {
-        doc.text(fmtNum(item.cant), cols.cant, y);
+        doc.text(fmtCant(item.cant), cols.cant, y);
         doc.text(item.unidad || '', cols.empaque, y);
         doc.text(item.nombre || '', cols.producto, y);
         // Single right-aligned string — no split $ 
