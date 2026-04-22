@@ -6616,6 +6616,7 @@
           <td>#${e.remision || '—'}</td>
           <td style="font-family:var(--mono)">${fmt(e.valor)}</td>
           <td style="font-family:var(--mono)">${fmt(e.cxc || e.valor)}</td>
+          ${dayCells}
           <td style="display:flex;gap:4px">
             <button class="btn sm secondary" 
           onclick="openEntregaModal('${e.id}')">✏</button>
