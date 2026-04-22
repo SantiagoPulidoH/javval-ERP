@@ -3102,13 +3102,34 @@
             </div>
             <div id="fl-compra-items"></div>
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 2px 2px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 2px 2px;flex-wrap:wrap;gap:10px">
             <span style="font-size:11px;color:var(--text3)">
-              💡 El subtotal se completa en el campo "Valor" arriba automáticamente
+              💡 Ingresa cuánto se pagó ahora. El pendiente se crea como CxP automáticamente.
             </span>
             <span style="font-family:var(--mono);font-size:14px;color:var(--accent)">
               Total productos: <strong id="fl-compra-total">$0</strong>
             </span>
+          </div>
+
+          <!-- Abono / Pendiente box -->
+          <div style="margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:rgba(245,166,35,0.04)">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end">
+              <div class="form-group" style="margin:0">
+                <label class="form-label" style="font-size:10px;color:var(--text3)">TOTAL FACTURA</label>
+                <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--accent);padding:7px 0" id="fl-factura-total">$0</div>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label" style="font-size:10px;color:var(--green)">💵 ABONO / PAGO HOY</label>
+                <input type="number" class="form-input" id="fl-abono" placeholder="0" min="0" step="1"
+                  style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--green)"
+                  oninput="onFlujoAbonoChange()">
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label" style="font-size:10px;color:var(--red)">🧾 QUEDA DEBIENDO</label>
+                <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--red);padding:7px 0" id="fl-pendiente">$0</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px" id="fl-cxp-aviso"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -6867,6 +6888,18 @@
       state.flujo = state.flujo.filter(f => f.id !== id);
       saveFlujoLocal();
       if (window.FS && rec?._fbId) window.FS.del('flujo_caja', rec._fbId);
+
+      // Also remove linked CxP (auto-generated for compras with pending balance)
+      const linkedCxpId = id + '_cxp';
+      const cxpIdx = state.cxpagar.findIndex(c => c.id === linkedCxpId);
+      if (cxpIdx >= 0) {
+        const oldCxp = state.cxpagar[cxpIdx];
+        state.cxpagar.splice(cxpIdx, 1);
+        saveFlujoLocal();
+        if (window.FS && oldCxp?._fbId) window.FS.del('cuentas_pagar', oldCxp._fbId);
+        renderCXPagar?.();
+      }
+
       renderFlujo();
       updateBadges();
       toast('Movimiento eliminado', 'info');
@@ -7912,20 +7945,51 @@
       });
       const totalEl = document.getElementById('fl-compra-total');
       if (totalEl) totalEl.textContent = fmt(total);
-      // Update fl-valor silently (no oninput trigger) to avoid infinite loop
-      // calcFCItem → calcFCTotal → onFlujoValorChange → calcFCTotal → ∞
+      // Update factura total in abono box
+      const facturaEl = document.getElementById('fl-factura-total');
+      if (facturaEl) facturaEl.textContent = fmt(total);
+      // Store total as data attribute for later read
+      if (facturaEl) facturaEl.dataset.raw = total;
+      // Recompute pendiente based on current abono
+      recalcPendiente();
+    }
+
+    function recalcPendiente() {
+      const totalEl = document.getElementById('fl-factura-total');
+      const total = parseFloat(totalEl?.dataset.raw) || 0;
+      const abono = parseFloat(document.getElementById('fl-abono')?.value) || 0;
+      const pendiente = Math.max(0, total - abono);
+      const pendEl = document.getElementById('fl-pendiente');
+      const avisoEl = document.getElementById('fl-cxp-aviso');
+      if (pendEl) pendEl.textContent = fmt(pendiente);
+      if (avisoEl) {
+        if (pendiente > 0) {
+          avisoEl.textContent = '⚠ Se creará CxP';
+          avisoEl.style.color = 'var(--red)';
+        } else if (total > 0) {
+          avisoEl.textContent = '✓ Pagado completo';
+          avisoEl.style.color = 'var(--green)';
+        } else {
+          avisoEl.textContent = '';
+        }
+      }
+    }
+
+    function onFlujoAbonoChange() {
+      // Abono is the value that actually impacts the flujo/saldo
+      const abono = parseFloat(document.getElementById('fl-abono').value) || 0;
       const valInput = document.getElementById('fl-valor');
-      if (valInput && !valInput.disabled && total > 0) {
-        valInput.value = Math.round(total);
-        // Update impact display directly without calling onFlujoValorChange()
+      if (valInput && !valInput.disabled) {
+        valInput.value = Math.round(abono);
         const impEl  = document.getElementById('fl-impacto');
         const impCol = document.getElementById('fl-impacto-col');
         if (impEl) {
-          impEl.textContent = '-' + fmt(total);
-          impEl.style.color = 'var(--red)';
+          impEl.textContent = abono > 0 ? '-' + fmt(abono) : '—';
+          impEl.style.color = abono > 0 ? 'var(--red)' : 'var(--text2)';
         }
         if (impCol) impCol.textContent = 'Compras';
       }
+      recalcPendiente();
     }
 
     // ── NEW selectRubro for the flujo modal (replaces old one) ───────────
@@ -8029,6 +8093,16 @@
       document.getElementById('fl-impacto-col').textContent = '';
       document.getElementById('fl-col-actual').value = '';
 
+      // Reset abono/pendiente UI
+      const abEl = document.getElementById('fl-abono');
+      const facEl = document.getElementById('fl-factura-total');
+      const pendEl = document.getElementById('fl-pendiente');
+      const avisoEl = document.getElementById('fl-cxp-aviso');
+      if (abEl) abEl.value = '';
+      if (facEl) { facEl.textContent = '$0'; facEl.dataset.raw = '0'; }
+      if (pendEl) pendEl.textContent = '$0';
+      if (avisoEl) avisoEl.textContent = '';
+
       if (id) {
         const m = state.flujo.find(x => x.id === id);
         if (!m) return;
@@ -8051,6 +8125,11 @@
           document.getElementById('fl-compra-detalle').style.display = 'block';
           m.compraItems.forEach(it => addFlujoCompraItem(it));
           calcFCTotal();
+          // Restore abono: stored m.abono, or default to val for legacy records
+          const abonoRestored = (typeof m.abono === 'number') ? m.abono : val;
+          const abEl2 = document.getElementById('fl-abono');
+          if (abEl2) abEl2.value = abonoRestored || '';
+          recalcPendiente();
         }
         onFlujoValorChange();
       } else {
@@ -8074,13 +8153,8 @@
 
       if (!dia || dia < 1 || dia > 31) { toast('Ingresa un día válido (1-31)', 'error'); return; }
       if (!rubro) { toast('Selecciona un rubro', 'error'); return; }
-      if (!val) { toast('Ingresa el valor del movimiento', 'error'); return; }
 
-      // Build amounts object — only one field has a value
-      const amounts = { ingOp: 0, ingOtros: 0, gastos: 0, compras: 0, proveedores: 0, provisiones: 0, creditos: 0 };
-      amounts[col] = val;
-
-      // Collect compra items
+      // Collect compra items first (needed before validation)
       const compraItems = [];
       document.querySelectorAll('[id^="fci-row-"]').forEach(row => {
         const idx = row.id.split('-').pop();
@@ -8102,11 +8176,38 @@
         }
       });
 
+      // For compras with items: abono can be 0 (todo a crédito) — no block needed
+      // For everything else: require a value
+      const isCompra = col === 'compras';
+      if (!isCompra && !val) { toast('Ingresa el valor del movimiento', 'error'); return; }
+      if (isCompra && compraItems.length === 0 && !val) {
+        toast('Agrega productos o ingresa un valor', 'error'); return;
+      }
+
+      // For compras: totalFactura = sum of items, abono = val (from fl-abono via onFlujoAbonoChange)
+      // For non-compras: val is the single amount
+      let totalFactura = val;
+      let abono = val;
+      let pendiente = 0;
+      if (isCompra && compraItems.length > 0) {
+        totalFactura = compraItems.reduce((s, i) => s + (i.subtotal || 0), 0);
+        abono = parseFloat(document.getElementById('fl-abono').value) || 0;
+        pendiente = Math.max(0, totalFactura - abono);
+      }
+
+      // Build amounts object — flujo only registers what was actually paid (abono)
+      const amounts = { ingOp: 0, ingOtros: 0, gastos: 0, compras: 0, proveedores: 0, provisiones: 0, creditos: 0 };
+      amounts[col] = isCompra ? abono : val;
+
+      const movId = document.getElementById('fl-id').value || genId();
       const mov = {
-        id: document.getElementById('fl-id').value || genId(),
+        id: movId,
         mes: currentFlujoMes, cuenta, dia, rubro, col,
         detalle: document.getElementById('fl-detalle').value,
         ...amounts, compraItems,
+        totalFactura: isCompra ? totalFactura : undefined,
+        abono: isCompra ? abono : undefined,
+        pendiente: isCompra ? pendiente : undefined,
         _order: Date.now(),
         createdAt: new Date().toISOString(),
       };
@@ -8118,13 +8219,14 @@
       saveFlujoLocal();
       if (window.FS) fsSave('flujo_caja', mov);
 
-      // Create compra record for product history
+      // Create compra record for product history (always records totalFactura for inventory)
       if (compraItems.length > 0) {
         const compraRec = {
           id: mov.id + '_compra',
           fecha: `${currentFlujoMes}-${String(dia).padStart(2, '0')}`,
           proveedor: rubro.replace('COMPRAS - ', ''),
-          total: val, items: compraItems, obs: mov.detalle,
+          total: totalFactura, items: compraItems, obs: mov.detalle,
+          abono, pendiente,
           createdAt: mov.createdAt,
         };
         const ci = state.compras.findIndex(c => c.id === compraRec.id);
@@ -8132,10 +8234,47 @@
         saveLocal();
       }
 
+      // If there's a pending balance, create/update a CxP record linked to this movement
+      const cxpLinkedId = mov.id + '_cxp';
+      if (isCompra && pendiente > 0) {
+        const proveedor = rubro.replace('COMPRAS - ', '');
+        const cxpRec = {
+          id: cxpLinkedId,
+          nombre: proveedor,
+          fechaCredito: `${currentFlujoMes}-${String(dia).padStart(2, '0')}`,
+          noFactura: '',
+          saldo: pendiente,
+          seccion: 'vigente',
+          notas: `Auto-generado desde compra del día ${dia} — Total: ${fmt(totalFactura)} / Abono: ${fmt(abono)}`,
+          linkedFlujoId: movId,
+          createdAt: new Date().toISOString(),
+        };
+        const ci = state.cxpagar.findIndex(c => c.id === cxpLinkedId);
+        if (ci >= 0) { cxpRec._fbId = state.cxpagar[ci]._fbId; state.cxpagar[ci] = cxpRec; }
+        else state.cxpagar.unshift(cxpRec);
+        saveFlujoLocal();
+        if (window.FS) fsSave('cuentas_pagar', cxpRec);
+      } else if (isCompra && pendiente === 0) {
+        // Pago completo ahora: si existe una CxP ligada de un guardado previo, eliminarla
+        const ci = state.cxpagar.findIndex(c => c.id === cxpLinkedId);
+        if (ci >= 0) {
+          const old = state.cxpagar[ci];
+          state.cxpagar.splice(ci, 1);
+          saveFlujoLocal();
+          if (window.FS && old?._fbId) window.FS.del('cuentas_pagar', old._fbId);
+        }
+      }
+
       closeModal('modal-flujo');
       renderFlujo();
+      renderCXPagar?.();
       updateBadges();
-      toast(`✓ Día ${dia} — ${rubro}: ${fmt(val)}`, 'success');
+      // Build toast message
+      let msg = `✓ Día ${dia} — ${rubro}: ${fmt(amounts[col])}`;
+      if (isCompra && pendiente > 0) {
+        msg += ` | CxP creada por ${fmt(pendiente)} ✓`;
+      }
+      toast(msg, 'success');
     }
 
 
