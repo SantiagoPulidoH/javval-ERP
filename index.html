@@ -16,6 +16,7 @@
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
 
   <style>
@@ -2121,10 +2122,199 @@
       padding: 10px 16px;
       font-size: 12px;
     }
+
+    /* ═══ LOGIN MODAL ═══ */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 32px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .login-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .login-brand-mark {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      color: #000;
+      font-family: var(--display);
+    }
+    .login-brand-text { display: flex; flex-direction: column; }
+    .login-brand-name {
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: 0.02em;
+    }
+    .login-brand-sub {
+      font-size: 10px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+    .login-title {
+      font-family: var(--display);
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .login-sub {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 24px;
+    }
+    .login-field { margin-bottom: 14px; }
+    .login-field label {
+      display: block;
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+    .login-field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--mono);
+    }
+    .login-field input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .login-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: var(--radius);
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      font-family: var(--display);
+      letter-spacing: 0.03em;
+    }
+    .login-btn:hover { background: var(--accent2); }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-error {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid var(--red);
+      color: var(--red);
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .login-error.show { display: block; }
+    .login-footer {
+      margin-top: 20px;
+      font-size: 11px;
+      color: var(--text3);
+      text-align: center;
+      font-family: var(--mono);
+    }
+
+    /* Topbar user badge */
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px 4px 4px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+    .user-avatar {
+      width: 26px;
+      height: 26px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #000;
+      font-size: 11px;
+      font-family: var(--display);
+    }
+    .logout-btn {
+      background: transparent;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 6px;
+      margin-left: 4px;
+      border-radius: 4px;
+    }
+    .logout-btn:hover { color: var(--red); background: rgba(239,68,68,0.1); }
   </style>
 </head>
 
 <body>
+
+  <!-- ══ LOGIN OVERLAY ═════════════════════════════════════════════════ -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-brand">
+        <span class="login-brand-mark">J</span>
+        <div class="login-brand-text">
+          <span class="login-brand-name">JAVVAL</span>
+          <span class="login-brand-sub">Sistema Operativo</span>
+        </div>
+      </div>
+      <div class="login-title">Iniciar sesión</div>
+      <div class="login-sub">Ingresa tu correo y contraseña para continuar</div>
+
+      <div id="login-error" class="login-error"></div>
+
+      <div class="login-field">
+        <label for="login-email">Correo</label>
+        <input type="email" id="login-email" autocomplete="email" placeholder="correo@ejemplo.com" onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()">
+      </div>
+      <div class="login-field">
+        <label for="login-password">Contraseña</label>
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+
+      <button id="login-btn" class="login-btn" onclick="doLogin()">Entrar</button>
+
+      <div class="login-footer">Acceso restringido · Distribuidora Javval</div>
+    </div>
+  </div>
 
   <!-- ══ SIDEBAR LAYOUT ══════════════════════════════════════════════ -->
   <div class="app-shell" id="app-shell">
@@ -2208,6 +2398,11 @@
         <div id="topbar-title" class="topbar-title">Dashboard</div>
         <div class="topbar-right">
           <div id="topbar-fb-status" class="topbar-fb"></div>
+          <div id="topbar-user" class="user-badge" style="display:none">
+            <span class="user-avatar" id="user-avatar">?</span>
+            <span id="user-name">—</span>
+            <button class="logout-btn" onclick="doLogout()" title="Cerrar sesión">Salir</button>
+          </div>
         </div>
       </div>
 
@@ -3905,14 +4100,71 @@
 
       window.firebaseReady = true;
 
-      // ── CONEXIÓN CONFIABLE: equivalente a auth.onAuthStateChanged de TaskPro ──
-      // .info/connected es SIEMPRE asíncrono — dispara después de un round-trip
-      // de red, garantizando que init() ya registró su listener.
-      let _fbBooted = false;
-      db.ref('.info/connected').on('value', function (snap) {
-        if (snap.val() === true && !_fbBooted) {
-          _fbBooted = true;
-          document.dispatchEvent(new CustomEvent('javval-connected'));
+      // ═══════════════════════════════════════════════════
+      // AUTH — Firebase Authentication (Email/Password)
+      // ═══════════════════════════════════════════════════
+      const auth = firebase.auth();
+      window.FS.auth = auth;
+
+      // UIDs autorizados — si no está en la lista, se rechaza automáticamente
+      // (además Firebase Rules ya bloquea lecturas/escrituras de UIDs no listados)
+      const ALLOWED_UIDS = {
+        '81qAbvf3G9S3YJB8ibmQSYKnDEs1': { name: 'Santiago',  initial: 'S' },
+        'xwmL8pfqUBXwaytOytqPgknqawo2': { name: 'Valentina', initial: 'V' },
+        'ueB4awpTzYfsykhP9tT85JmzmeJ3': { name: 'Javier',    initial: 'J' }
+      };
+
+      // Sesión persistente: los usuarios quedan logueados aunque cierren el browser.
+      // Solo se cierra con "Salir" manual o login en otro dispositivo.
+      auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e =>
+        console.warn('Persistence set error:', e)
+      );
+
+      // ── Estado de autenticación: dispara el arranque real de la app ────
+      let _authBooted = false;
+      auth.onAuthStateChanged(async function(user) {
+        const loginOverlay = document.getElementById('login-overlay');
+        const userBadge    = document.getElementById('topbar-user');
+
+        if (!user) {
+          // No logueado → mostrar login, ocultar topbar user
+          if (loginOverlay) loginOverlay.classList.remove('hidden');
+          if (userBadge)    userBadge.style.display = 'none';
+          return;
+        }
+
+        // Validar UID autorizado (defensa en profundidad — las Rules ya filtran)
+        const profile = ALLOWED_UIDS[user.uid];
+        if (!profile) {
+          console.warn('UID no autorizado:', user.uid);
+          await auth.signOut();
+          const errEl = document.getElementById('login-error');
+          if (errEl) {
+            errEl.textContent = 'Usuario no autorizado para acceder a JAVVAL.';
+            errEl.classList.add('show');
+          }
+          return;
+        }
+
+        // Autorizado → ocultar login, mostrar badge
+        if (loginOverlay) loginOverlay.classList.add('hidden');
+        if (userBadge) {
+          userBadge.style.display = 'flex';
+          const avEl = document.getElementById('user-avatar');
+          const nmEl = document.getElementById('user-name');
+          if (avEl) avEl.textContent = profile.initial;
+          if (nmEl) nmEl.textContent = profile.name;
+        }
+
+        // Arrancar listeners de Firebase UNA sola vez — equivalente al
+        // 'javval-connected' del patrón anterior.
+        if (!_authBooted) {
+          _authBooted = true;
+          db.ref('.info/connected').on('value', function(snap) {
+            if (snap.val() === true) {
+              document.dispatchEvent(new CustomEvent('javval-connected'));
+            }
+          });
         }
       });
 
@@ -3920,6 +4172,59 @@
       console.error('Firebase init error:', e);
       window.firebaseReady = false;
       // Status update on error happens from init() setTimeout
+    }
+
+    // ═══════════════════════════════════════════════════
+    // LOGIN / LOGOUT helpers
+    // ═══════════════════════════════════════════════════
+    async function doLogin() {
+      const emailEl = document.getElementById('login-email');
+      const passEl  = document.getElementById('login-password');
+      const errEl   = document.getElementById('login-error');
+      const btnEl   = document.getElementById('login-btn');
+      const email = (emailEl.value || '').trim();
+      const pass  = passEl.value || '';
+
+      errEl.classList.remove('show');
+
+      if (!email || !pass) {
+        errEl.textContent = 'Ingresa correo y contraseña.';
+        errEl.classList.add('show');
+        return;
+      }
+
+      btnEl.disabled = true;
+      btnEl.textContent = 'Verificando...';
+
+      try {
+        await firebase.auth().signInWithEmailAndPassword(email, pass);
+        passEl.value = '';
+      } catch (e) {
+        const map = {
+          'auth/invalid-email':       'Correo inválido.',
+          'auth/user-not-found':      'Usuario no registrado.',
+          'auth/wrong-password':      'Contraseña incorrecta.',
+          'auth/invalid-credential':  'Correo o contraseña incorrectos.',
+          'auth/too-many-requests':   'Demasiados intentos fallidos. Espera unos minutos.',
+          'auth/network-request-failed': 'Sin conexión a internet.'
+        };
+        errEl.textContent = map[e.code] || ('Error: ' + (e.message || e.code));
+        errEl.classList.add('show');
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = 'Entrar';
+      }
+    }
+
+    async function doLogout() {
+      if (!confirm('¿Cerrar sesión?')) return;
+      try {
+        await firebase.auth().signOut();
+        location.reload();
+      } catch (e) {
+        console.error('Logout error:', e);
+        alert('Error al cerrar sesión: ' + (e.message || e.code));
+      }
     }
 
     // ═══════════════════════════════════════════════════
@@ -6615,7 +6920,7 @@
           <td><strong>${e.cliente || '—'}</strong></td>
           <td>#${e.remision || '—'}</td>
           <td style="font-family:var(--mono)">${fmt(e.valor)}</td>
-          <td style="font-family:var(--mono)">${fmt(e.cxc || e.valor)}</td>
+          <td style="font-family:var(--mono)">${fmt(pendiente)}</td>
           ${dayCells}
           <td style="display:flex;gap:4px">
             <button class="btn sm secondary" 
@@ -6666,7 +6971,7 @@
         fecha, cliente,
         remision: document.getElementById('ent-remision').value,
         valor,
-        cxc: parseFloat(document.getElementById('ent-cxc').value) || valor,
+        cxc: (document.getElementById('ent-cxc').value === '' ? valor : parseFloat(document.getElementById('ent-cxc').value) || 0),
         mes: fecha.slice(0, 7),
         cobros: existId ? (state.entregas.find(e => e.id === existId)?.cobros || []) : [],
         createdAt: new Date().toISOString(),
