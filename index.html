@@ -5261,14 +5261,91 @@
       window.FS.listen('ventas', d => applyDocs('ventas', d, renderVentas));
       window.FS.listen('compras', d => applyDocs('compras', d, null)); // renderCompras not implemented yet
       window.FS.listen('cobros', d => applyDocs('cobros', d, renderCobros));
+
+      // ── v60: Datos maestros (productos, clientes, proveedores) sincronizados a Firebase ──
+      // Antes vivían solo en localStorage, lo que causaba desync entre browsers cuando
+      // alguien importaba un Excel o eliminaba registros. Ahora son source-of-truth en Firebase.
+      // Patrón: getAll inicial (carga rápida) + listen continuo (sync cross-browser).
+
+      window.FS.getAll('productos').then(docs => {
+        if (docs.length > 0) {
+          state.productos = docs;
+          saveLocal();
+          renderProductos();
+          updateBadges();
+          renderDashboard();
+        }
+      }).catch(e => console.warn('getAll productos:', e));
+
+      window.FS.getAll('clientes').then(docs => {
+        if (docs.length > 0) {
+          state.clientes = docs;
+          saveLocal();
+          renderClientes();
+        }
+      }).catch(e => console.warn('getAll clientes:', e));
+
+      window.FS.getAll('proveedores').then(docs => {
+        if (docs.length > 0) {
+          state.proveedores = docs;
+          saveLocal();
+          renderProveedores();
+        }
+      }).catch(e => console.warn('getAll proveedores:', e));
+
+      // Listeners en vivo — se aplica array vacío para propagar deletes
+      window.FS.listen('productos', docs => {
+        state.productos = docs || [];
+        saveLocal();
+        renderProductos?.();
+        updateBadges?.();
+        renderDashboard?.();
+      });
+
+      window.FS.listen('clientes', docs => {
+        state.clientes = docs || [];
+        saveLocal();
+        renderClientes?.();
+      });
+
+      window.FS.listen('proveedores', docs => {
+        state.proveedores = docs || [];
+        saveLocal();
+        renderProveedores?.();
+      });
     }
 
     // Seed Firestore with master data on very first run
     async function seedFirestoreIfEmpty() {
-      // Datos maestros (productos, clientes, proveedores) viven en localStorage.
-      // Solo se sincronizan a Firebase cuando el usuario hace una importación manual.
-      // Esta función solo existe para compatibilidad — no hace nada.
-      return;
+      // v60: si Firebase está vacío y localStorage tiene datos, los sube por primera vez.
+      // Esto previene que un browser nuevo (sin localStorage) se quede vacío esperando
+      // que alguien importe Excel. Si ya hay datos en Firebase, no hace nada.
+      if (!window.FS) return;
+      try {
+        const checks = [
+          { col: 'productos',   localKey: 'productos' },
+          { col: 'clientes',    localKey: 'clientes' },
+          { col: 'proveedores', localKey: 'proveedores' }
+        ];
+        for (const { col, localKey } of checks) {
+          const snap = await window.FS.db.ref('javval/' + col).limitToFirst(1).once('value');
+          if (snap.exists()) continue;  // ya hay datos remotos, no sobrescribir
+          const localData = state[localKey] || [];
+          if (localData.length === 0) continue;  // nada local que subir tampoco
+          console.log(`[seed] Subiendo ${localData.length} ${col} a Firebase (estaba vacío)`);
+          const updates = {};
+          localData.forEach(item => {
+            const extra = item.unidad ? `_${item.unidad}` : '';
+            const docId = item._fbId || slugify((item.nombre || '') + extra);
+            item._fbId = docId;
+            updates[`javval/${col}/${docId}`] = toFS(item);
+          });
+          await window.FS.db.ref().update(updates);
+        }
+        saveLocal();
+      } catch (e) {
+        console.warn('seedFirestoreIfEmpty:', e);
+      }
     }
 
     // ════════════════════════════════════════════
@@ -5472,6 +5549,24 @@
     function prodAcFilter(input, listId, rowIdx, mode) {
       const val = input.value.toUpperCase();
       const list = document.getElementById(listId);
+
+      // Posicionar dropdown con coords fijas para escapar el grid estrecho de la fila.
+      // Ancho mínimo de 280px para que se lean los nombres de producto en mobile.
+      const rect = input.getBoundingClientRect();
+      const isMobile = window.innerWidth < 768;
+      const minWidth = isMobile ? Math.min(window.innerWidth - 24, 320) : Math.max(rect.width, 280);
+      let leftPos = rect.left;
+      // Si el dropdown se sale de la pantalla por la derecha, ajustarlo
+      if (leftPos + minWidth > window.innerWidth - 8) {
+        leftPos = Math.max(8, window.innerWidth - minWidth - 8);
+      }
+      list.style.position = 'fixed';
+      list.style.top = (rect.bottom + 4) + 'px';
+      list.style.left = leftPos + 'px';
+      list.style.width = minWidth + 'px';
+      list.style.maxHeight = isMobile ? '180px' : '240px';
+      list.style.zIndex = '99999';
+
       // Group by name, show all variants
       const filtered = val.length < 1 ? state.productos.slice(0, 12) : state.productos.filter(p => p.nombre.toUpperCase().includes(val)).slice(0, 12);
 
@@ -8682,13 +8777,45 @@
         saveLocal();
         setProgress(30, 'Datos locales actualizados…');
 
-        // ── 2. Datos maestros → solo localStorage (instantáneo) ──────────
-        // Productos, clientes y proveedores NO van a Firestore.
-        // Son datos de catálogo: pesan mucho, cambian poco, y cada navegador
-        // los carga desde su propio localStorage. Solo las transacciones
-        // (ventas, compras, cobros) se sincronizan en tiempo real vía Firebase.
-        setProgress(60, 'Guardando en almacenamiento local…');
-        // Already saved above via saveLocal() — nothing else to do here
+        // ── 2. v60: Sincronizar a Firebase para que TODOS los browsers vean los cambios ──
+        // Antes solo se guardaba en localStorage → otros browsers nunca veían los cambios.
+        // Ahora sincronizamos los 3 catálogos completos a Firebase con batch updates atómicos.
+        if (window.FS) {
+          setProgress(40, 'Sincronizando a Firebase…');
+          try {
+            // Borrar lo viejo y escribir lo nuevo en una sola operación atómica por colección
+            const buildUpdates = (colName, items, keyField) => {
+              const updates = {};
+              // Marcar para borrar todo lo existente en esa colección
+              updates[`javval/${colName}`] = null;
+              // Nota: podemos sobrescribir directamente con los nuevos al hacer un único multi-path update
+              items.forEach(item => {
+                const extra = item.unidad ? `_${item.unidad}` : '';
+                const docId = item._fbId || slugify((item[keyField] || '') + extra);
+                item._fbId = docId;
+                updates[`javval/${colName}/${docId}`] = toFS(item);
+              });
+              return updates;
+            };
+
+            // Productos
+            setProgress(50, `Sincronizando ${products.length} productos…`);
+            await window.FS.db.ref().update(buildUpdates('productos', products, 'nombre'));
+
+            // Clientes
+            setProgress(70, `Sincronizando ${clients.length} clientes…`);
+            await window.FS.db.ref().update(buildUpdates('clientes', clients, 'nombre'));
+
+            // Proveedores
+            setProgress(85, `Sincronizando ${proveedores.length} proveedores…`);
+            await window.FS.db.ref().update(buildUpdates('proveedores', proveedores, 'nombre'));
+
+            saveLocal();  // re-guardar con _fbId asignados
+          } catch (fbErr) {
+            console.error('Firebase sync error:', fbErr);
+            toast(`⚠ Datos guardados localmente, pero Firebase falló: ${fbErr.message}`, 'error');
+          }
+        }
 
         setProgress(100, '✅ Importación completada');
 
