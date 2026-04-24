@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JAVVAL — Sistema Operativo v61</title>
+  <title>JAVVAL — Sistema Operativo v62</title>
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"
     rel="stylesheet">
@@ -3424,6 +3424,47 @@
 
             <div class="rubros-grid" id="rubros-grid"></div>
           </div>
+
+          <!-- BACKUP SECTION -->
+          <div class="setup-section" style="margin-top:24px;border-top:1px solid var(--border);padding-top:24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div>
+                <div class="setup-section-title">💾 Backup y Restauración</div>
+                <div class="setup-section-sub">Descarga una copia completa de la base de datos o restaura desde un
+                  backup previo. Hazlo antes de operaciones masivas (eliminar, importar, migrar).</div>
+              </div>
+            </div>
+
+            <div id="backup-info"
+              style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;font-size:13px">
+              <div style="display:flex;align-items:center;gap:8px;color:var(--text2)">
+                <span id="backup-status-icon">📅</span>
+                <span id="backup-status-text">Nunca has descargado un backup desde este dispositivo.</span>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" onclick="downloadFirebaseBackup()"
+                title="Descarga un JSON con toda la base de datos de Firebase">
+                💾 Descargar Backup Ahora
+              </button>
+              <label class="btn secondary" style="cursor:pointer;color:var(--red);border-color:var(--red)"
+                title="Restaura la base de datos desde un archivo de backup. ESTA ACCIÓN REEMPLAZA TODO.">
+                📥 Restaurar desde Backup
+                <input type="file" accept=".json" style="display:none" onchange="restoreFirebaseBackup(this)">
+              </label>
+            </div>
+
+            <div style="margin-top:14px;font-size:11px;color:var(--text3);line-height:1.6">
+              <strong style="color:var(--accent)">Recomendaciones:</strong><br>
+              • Descarga un backup <strong>mínimo 1 vez por semana</strong> y guárdalo en Google Drive o Dropbox.<br>
+              • Descarga backup <strong>antes</strong> de eliminar registros en masa, importar Excel grandes, o subir
+              una nueva versión del sistema.<br>
+              • El archivo es un JSON — puedes abrirlo con cualquier editor de texto. No lo edites manualmente.<br>
+              • Restaurar <strong>reemplaza todo</strong> — úsalo solo si algo salió mal y necesitas volver a un estado
+              anterior.
+            </div>
+          </div>
         </section>
 
       </main>
@@ -6468,6 +6509,176 @@
     }
 
     // ════════════════════════════════════════════
+    // BACKUP / RESTORE — Firebase Realtime Database
+    // ════════════════════════════════════════════
+    // Descarga el árbol completo de /javval como JSON. Es la copia autoritaria
+    // de TODA la data (ventas, flujo, productos, clientes, etc.).
+    // No incluye usuarios de Authentication (esos viven en otro servicio Firebase).
+    async function downloadFirebaseBackup() {
+      if (!window.FS?.db) {
+        toast('Firebase no está conectado — no se puede hacer backup', 'error');
+        return;
+      }
+      toast('📦 Descargando backup desde Firebase...', 'info');
+      try {
+        const snap = await window.FS.db.ref('javval').once('value');
+        const data = snap.val() || {};
+
+        // Conteo rápido para que el usuario vea qué está respaldando
+        const counts = {};
+        Object.keys(data).forEach(k => {
+          const v = data[k];
+          counts[k] = v && typeof v === 'object' ? Object.keys(v).length : 1;
+        });
+
+        const backup = {
+          _meta: {
+            app: 'JAVVAL Sistema Operativo',
+            exportedAt: new Date().toISOString(),
+            exportedBy: window.FS.auth?.currentUser?.email || 'desconocido',
+            counts
+          },
+          data
+        };
+
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        // Nombre con fecha: JAVVAL_backup_2026-04-24_14h22.json
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const fname = `JAVVAL_backup_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}h${pad(now.getMinutes())}.json`;
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Registrar última fecha de backup (solo local — no pisa data crítica)
+        try { localStorage.setItem('javval_last_backup', now.toISOString()); } catch (e) { }
+        updateBackupStatus();
+
+        // Resumen para el usuario
+        const totalDocs = Object.values(counts).reduce((a, b) => a + b, 0);
+        const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+        toast(`✅ Backup descargado — ${totalDocs} registros · ${sizeMB} MB`, 'success');
+      } catch (e) {
+        console.error('Backup error:', e);
+        toast('Error al descargar backup: ' + e.message, 'error');
+      }
+    }
+
+    // Restaura la base completa desde un archivo JSON de backup.
+    // OPERACIÓN DESTRUCTIVA: reemplaza todo el árbol /javval.
+    // Requiere doble confirmación + escribir la palabra RESTAURAR.
+    async function restoreFirebaseBackup(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      if (!window.FS?.db) {
+        toast('Firebase no está conectado', 'error');
+        input.value = '';
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+
+        // Validaciones
+        if (!parsed || typeof parsed !== 'object') throw new Error('JSON inválido');
+        if (!parsed._meta || parsed._meta.app !== 'JAVVAL Sistema Operativo') {
+          if (!confirm('⚠️ Este archivo no parece ser un backup oficial de JAVVAL.\n\n¿Continuar de todos modos? (Arriesgas corromper la base)')) {
+            input.value = '';
+            return;
+          }
+        }
+        if (!parsed.data || typeof parsed.data !== 'object') {
+          throw new Error('El archivo no contiene un campo "data" válido');
+        }
+
+        const counts = parsed._meta?.counts || {};
+        const totalDocs = Object.values(counts).reduce((a, b) => a + b, 0);
+        const exportedAt = parsed._meta?.exportedAt
+          ? new Date(parsed._meta.exportedAt).toLocaleString('es-CO')
+          : 'fecha desconocida';
+        const exportedBy = parsed._meta?.exportedBy || 'desconocido';
+
+        // Doble confirmación
+        const confirm1 = confirm(
+          `🛑 RESTAURAR BASE DE DATOS\n\n` +
+          `Backup del: ${exportedAt}\n` +
+          `Generado por: ${exportedBy}\n` +
+          `Total registros: ${totalDocs}\n\n` +
+          `Esta acción REEMPLAZA TODO en Firebase con el contenido del backup.\n` +
+          `Todos los cambios posteriores al backup SE PERDERÁN.\n\n` +
+          `¿Continuar?`
+        );
+        if (!confirm1) { input.value = ''; return; }
+
+        const typed = prompt('Escribe exactamente la palabra RESTAURAR (en mayúsculas) para confirmar:');
+        if (typed !== 'RESTAURAR') {
+          toast('Restauración cancelada', 'info');
+          input.value = '';
+          return;
+        }
+
+        toast('🔄 Restaurando desde backup...', 'info');
+
+        // Borrar todo y escribir el backup en una operación atómica
+        await window.FS.db.ref('javval').set(parsed.data);
+
+        toast('✅ Base restaurada. La página se recargará en 3 segundos...', 'success');
+        setTimeout(() => location.reload(), 3000);
+      } catch (e) {
+        console.error('Restore error:', e);
+        toast('Error restaurando: ' + e.message, 'error');
+      } finally {
+        input.value = '';
+      }
+    }
+
+    // Actualiza el texto "Último backup" en Setup
+    function updateBackupStatus() {
+      const textEl = document.getElementById('backup-status-text');
+      const iconEl = document.getElementById('backup-status-icon');
+      if (!textEl) return;
+      let iso = null;
+      try { iso = localStorage.getItem('javval_last_backup'); } catch (e) { }
+      if (!iso) {
+        textEl.textContent = 'Nunca has descargado un backup desde este dispositivo.';
+        textEl.style.color = 'var(--red)';
+        if (iconEl) iconEl.textContent = '⚠️';
+        return;
+      }
+      const then = new Date(iso);
+      const now = new Date();
+      const days = Math.floor((now - then) / (1000 * 60 * 60 * 24));
+      const fmtFecha = then.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+      if (days === 0) {
+        textEl.textContent = `Último backup: hoy (${fmtFecha})`;
+        textEl.style.color = 'var(--green)';
+        if (iconEl) iconEl.textContent = '✅';
+      } else if (days <= 7) {
+        textEl.textContent = `Último backup: hace ${days} día${days === 1 ? '' : 's'} (${fmtFecha})`;
+        textEl.style.color = 'var(--green)';
+        if (iconEl) iconEl.textContent = '✅';
+      } else if (days <= 14) {
+        textEl.textContent = `Último backup: hace ${days} días (${fmtFecha}). Considera hacer uno nuevo.`;
+        textEl.style.color = 'var(--accent)';
+        if (iconEl) iconEl.textContent = '⏰';
+      } else {
+        textEl.textContent = `⚠ Último backup: hace ${days} días (${fmtFecha}). Descarga uno nuevo ya.`;
+        textEl.style.color = 'var(--red)';
+        if (iconEl) iconEl.textContent = '⚠️';
+      }
+    }
+
+    // ════════════════════════════════════════════
     // EXPORT / IMPORT EXCEL — CLIENTES
     // ════════════════════════════════════════════
     function exportClientesExcel() {
@@ -9411,6 +9622,7 @@
     function renderSetup() {
       renderRubrosGrid(_rubroFilter);
       renderVendedoresSetup();
+      updateBackupStatus();
     }
 
     function filterRubros(col) {
