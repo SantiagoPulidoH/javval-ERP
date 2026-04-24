@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JAVVAL — Sistema Operativo v2</title>
+  <title>JAVVAL — Sistema Operativo v61</title>
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"
     rel="stylesheet">
@@ -1322,8 +1322,10 @@
       }
 
       /* En mobile, select nativo se ve mejor que datalist para vendedor */
-      .form-select, select.form-input {
-        font-size: 16px !important;  /* evita zoom automático iOS */
+      .form-select,
+      select.form-input {
+        font-size: 16px !important;
+        /* evita zoom automático iOS */
       }
 
       /* Inventario filter buttons: wrap */
@@ -2160,7 +2162,11 @@
       justify-content: center;
       padding: 20px;
     }
-    .login-overlay.hidden { display: none; }
+
+    .login-overlay.hidden {
+      display: none;
+    }
+
     .login-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -2168,14 +2174,16 @@
       padding: 40px 32px;
       max-width: 380px;
       width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     }
+
     .login-brand {
       display: flex;
       align-items: center;
       gap: 12px;
       margin-bottom: 28px;
     }
+
     .login-brand-mark {
       width: 44px;
       height: 44px;
@@ -2189,31 +2197,43 @@
       color: #000;
       font-family: var(--display);
     }
-    .login-brand-text { display: flex; flex-direction: column; }
+
+    .login-brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+
     .login-brand-name {
       font-family: var(--display);
       font-weight: 800;
       font-size: 18px;
       letter-spacing: 0.02em;
     }
+
     .login-brand-sub {
       font-size: 10px;
       color: var(--text3);
       text-transform: uppercase;
       letter-spacing: 0.15em;
     }
+
     .login-title {
       font-family: var(--display);
       font-size: 22px;
       font-weight: 700;
       margin-bottom: 6px;
     }
+
     .login-sub {
       font-size: 13px;
       color: var(--text2);
       margin-bottom: 24px;
     }
-    .login-field { margin-bottom: 14px; }
+
+    .login-field {
+      margin-bottom: 14px;
+    }
+
     .login-field label {
       display: block;
       font-size: 11px;
@@ -2222,6 +2242,7 @@
       letter-spacing: 0.1em;
       margin-bottom: 6px;
     }
+
     .login-field input {
       width: 100%;
       background: var(--surface2);
@@ -2232,10 +2253,12 @@
       font-size: 14px;
       font-family: var(--mono);
     }
+
     .login-field input:focus {
       outline: none;
       border-color: var(--accent);
     }
+
     .login-btn {
       width: 100%;
       background: var(--accent);
@@ -2250,10 +2273,18 @@
       font-family: var(--display);
       letter-spacing: 0.03em;
     }
-    .login-btn:hover { background: var(--accent2); }
-    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .login-btn:hover {
+      background: var(--accent2);
+    }
+
+    .login-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .login-error {
-      background: rgba(239,68,68,0.1);
+      background: rgba(239, 68, 68, 0.1);
       border: 1px solid var(--red);
       color: var(--red);
       padding: 10px 12px;
@@ -2262,7 +2293,11 @@
       margin-bottom: 14px;
       display: none;
     }
-    .login-error.show { display: block; }
+
+    .login-error.show {
+      display: block;
+    }
+
     .login-footer {
       margin-top: 20px;
       font-size: 11px;
@@ -2283,6 +2318,7 @@
       font-size: 12px;
       color: var(--text2);
     }
+
     .user-avatar {
       width: 26px;
       height: 26px;
@@ -2296,6 +2332,7 @@
       font-size: 11px;
       font-family: var(--display);
     }
+
     .logout-btn {
       background: transparent;
       border: none;
@@ -2306,7 +2343,11 @@
       margin-left: 4px;
       border-radius: 4px;
     }
-    .logout-btn:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+
+    .logout-btn:hover {
+      color: var(--red);
+      background: rgba(239, 68, 68, 0.1);
+    }
   </style>
 </head>
 
@@ -2329,17 +2370,21 @@
 
       <div class="login-field">
         <label for="login-email">Correo</label>
-        <input type="email" id="login-email" autocomplete="email" placeholder="correo@ejemplo.com" onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()">
+        <input type="email" id="login-email" autocomplete="email" placeholder="correo@ejemplo.com"
+          onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()">
       </div>
       <div class="login-field">
         <label for="login-password">Contraseña</label>
-        <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()">
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••"
+          onkeydown="if(event.key==='Enter') doLogin()">
       </div>
 
       <button id="login-btn" class="login-btn" onclick="doLogin()">Entrar</button>
 
       <div style="text-align:center;margin-top:14px">
-        <button type="button" onclick="doForgotPassword()" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;text-decoration:underline;font-family:var(--mono)">¿Olvidaste tu contraseña?</button>
+        <button type="button" onclick="doForgotPassword()"
+          style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;text-decoration:underline;font-family:var(--mono)">¿Olvidaste
+          tu contraseña?</button>
       </div>
 
       <div class="login-footer">Acceso restringido · Distribuidora Javval</div>
@@ -2378,7 +2423,7 @@
           <span class="snav-icon">📋</span><span class="snav-label">Entregas y Cobros</span>
         </button>
         <button class="snav-btn" onclick="switchTab('cxpagar',this)" data-tab="cxpagar">
-          <span class="snav-icon">🏦</span><span class="snav-label">CXC Pagar</span>
+          <span class="snav-icon">🏦</span><span class="snav-label">CXP Pagar</span>
         </button>
 
         <div class="snav-divider"></div>
@@ -2543,7 +2588,7 @@
             <div class="kpi-card" style="border-top-color:#06b6d4">
               <div class="kpi-label">Deuda Total Proveedores</div>
               <div class="kpi-value" id="kpi-deuda-prov" style="color:#06b6d4">$0</div>
-              <div class="kpi-sub">CXC Pagar vigente + antigua</div>
+              <div class="kpi-sub">CXP Pagar vigente + antigua</div>
             </div>
           </div>
 
@@ -3185,11 +3230,11 @@
             </div>
             <div class="cxc-match-grid" style="margin-top:16px">
               <div class="cxc-match-item">
-                <div class="cxc-match-label">Total CXC (Cartera pendiente)</div>
+                <div class="cxc-match-label">Cartera Pendiente del Mes</div>
                 <div class="cxc-match-val" id="cxc-total-pendiente">$0</div>
               </div>
               <div class="cxc-match-item">
-                <div class="cxc-match-label">Ingresos Op. según planilla</div>
+                <div class="cxc-match-label">Cobros del Mes (planilla)</div>
                 <div class="cxc-match-val" id="cxc-ing-planilla">$0</div>
               </div>
               <div class="cxc-match-item">
@@ -4137,9 +4182,9 @@
       // UIDs autorizados — si no está en la lista, se rechaza automáticamente
       // (además Firebase Rules ya bloquea lecturas/escrituras de UIDs no listados)
       const ALLOWED_UIDS = {
-        '81qAbvf3G9S3YJB8ibmQSYKnDEs1': { name: 'Santiago',  initial: 'S' },
+        '81qAbvf3G9S3YJB8ibmQSYKnDEs1': { name: 'Santiago', initial: 'S' },
         'xwmL8pfqUBXwaytOytqPgknqawo2': { name: 'Valentina', initial: 'V' },
-        'ueB4awpTzYfsykhP9tT85JmzmeJ3': { name: 'Javier',    initial: 'J' }
+        'ueB4awpTzYfsykhP9tT85JmzmeJ3': { name: 'Javier', initial: 'J' }
       };
 
       // Sesión persistente: los usuarios quedan logueados aunque cierren el browser.
@@ -4150,14 +4195,14 @@
 
       // ── Estado de autenticación: dispara el arranque real de la app ────
       let _authBooted = false;
-      auth.onAuthStateChanged(async function(user) {
+      auth.onAuthStateChanged(async function (user) {
         const loginOverlay = document.getElementById('login-overlay');
-        const userBadge    = document.getElementById('topbar-user');
+        const userBadge = document.getElementById('topbar-user');
 
         if (!user) {
           // No logueado → mostrar login, ocultar topbar user
           if (loginOverlay) loginOverlay.classList.remove('hidden');
-          if (userBadge)    userBadge.style.display = 'none';
+          if (userBadge) userBadge.style.display = 'none';
           return;
         }
 
@@ -4188,7 +4233,7 @@
         // 'javval-connected' del patrón anterior.
         if (!_authBooted) {
           _authBooted = true;
-          db.ref('.info/connected').on('value', function(snap) {
+          db.ref('.info/connected').on('value', function (snap) {
             if (snap.val() === true) {
               document.dispatchEvent(new CustomEvent('javval-connected'));
             }
@@ -4207,11 +4252,11 @@
     // ═══════════════════════════════════════════════════
     async function doLogin() {
       const emailEl = document.getElementById('login-email');
-      const passEl  = document.getElementById('login-password');
-      const errEl   = document.getElementById('login-error');
-      const btnEl   = document.getElementById('login-btn');
+      const passEl = document.getElementById('login-password');
+      const errEl = document.getElementById('login-error');
+      const btnEl = document.getElementById('login-btn');
       const email = (emailEl.value || '').trim();
-      const pass  = passEl.value || '';
+      const pass = passEl.value || '';
 
       errEl.classList.remove('show');
 
@@ -4229,11 +4274,11 @@
         passEl.value = '';
       } catch (e) {
         const map = {
-          'auth/invalid-email':       'Correo inválido.',
-          'auth/user-not-found':      'Usuario no registrado.',
-          'auth/wrong-password':      'Contraseña incorrecta.',
-          'auth/invalid-credential':  'Correo o contraseña incorrectos.',
-          'auth/too-many-requests':   'Demasiados intentos fallidos. Espera unos minutos.',
+          'auth/invalid-email': 'Correo inválido.',
+          'auth/user-not-found': 'Usuario no registrado.',
+          'auth/wrong-password': 'Contraseña incorrecta.',
+          'auth/invalid-credential': 'Correo o contraseña incorrectos.',
+          'auth/too-many-requests': 'Demasiados intentos fallidos. Espera unos minutos.',
           'auth/network-request-failed': 'Sin conexión a internet.'
         };
         errEl.textContent = map[e.code] || ('Error: ' + (e.message || e.code));
@@ -4257,7 +4302,7 @@
 
     async function doForgotPassword() {
       const emailEl = document.getElementById('login-email');
-      const errEl   = document.getElementById('login-error');
+      const errEl = document.getElementById('login-error');
       const email = (emailEl?.value || '').trim();
 
       if (!email) {
@@ -4281,7 +4326,7 @@
         errEl.style.color = 'var(--green)';
       } catch (e) {
         const map = {
-          'auth/invalid-email':  'Correo inválido.',
+          'auth/invalid-email': 'Correo inválido.',
           'auth/user-not-found': 'No hay un usuario registrado con ese correo.',
           'auth/network-request-failed': 'Sin conexión a internet.'
         };
@@ -5323,8 +5368,8 @@
       if (!window.FS) return;
       try {
         const checks = [
-          { col: 'productos',   localKey: 'productos' },
-          { col: 'clientes',    localKey: 'clientes' },
+          { col: 'productos', localKey: 'productos' },
+          { col: 'clientes', localKey: 'clientes' },
           { col: 'proveedores', localKey: 'proveedores' }
         ];
         for (const { col, localKey } of checks) {
@@ -5437,7 +5482,7 @@
     // Tab name → display label for topbar
     const TAB_LABELS = {
       dashboard: 'Dashboard', ventas: 'Ventas', flujo: 'Flujo de Caja',
-      entregas: 'Entregas y Cobros', cxpagar: 'CXC Pagar',
+      entregas: 'Entregas y Cobros', cxpagar: 'CXP Pagar',
       clientes: 'Clientes', productos: 'Productos', proveedores: 'Proveedores',
       inventario: 'Inventario', setup: 'Setup'
     };
@@ -6951,7 +6996,7 @@
     // ════════════════════════════════════════════
 
     // ════════════════════════════════════════════════════════════════════
-    // CUENTAS POR PAGAR (CXC Pagar)
+    // CUENTAS POR PAGAR (CXP Pagar)
     // ════════════════════════════════════════════════════════════════════
     function renderCXPagar(list = null) {
       const items = list || state.cxpagar;
@@ -7069,11 +7114,30 @@
       const items = state.entregas.filter(e => (e.mes || e.fecha?.slice(0, 7)) === mes);
 
       // Update cuadre summary
+      // v61: "Ingresos según planilla" ahora refleja TODO lo cobrado por las remisiones
+      // del mes, incluyendo las ventas de contado (donde cxc_inicial = 0 desde el registro
+      // y no requieren marcar punto en la semana).
+      //
+      // Lógica:
+      //   cobroTotal(remisión) = pago_contado_implícito + cobros_en_semanas
+      //                        = (valor − cxc_inicial) + Σ puntos_semanas
+      //                        = valor − cxc_pendiente_actual
+      //
+      //   Total CXC pendiente = Σ cxc_pendiente_actual de cada remisión (igual que antes).
+      //
+      // Así, cuando Valentina registra una remisión a contado con CXC=$0, el sistema la
+      // cuenta automáticamente como cobrada ese día — sin pedirle marcar un punto extra.
+
       const totalPend = items.reduce((s, e) => {
         const cob = (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0);
         return s + Math.max(0, (e.cxc ?? e.valor ?? 0) - cob);
       }, 0);
-      const totalCob = items.reduce((s, e) => s + (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0), 0);
+      // Cobros del mes (planilla): valor total − pendiente actual, por cada remisión
+      const totalCob = items.reduce((s, e) => {
+        const cob = (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0);
+        const pend = Math.max(0, (e.cxc ?? e.valor ?? 0) - cob);
+        return s + Math.max(0, (e.valor || 0) - pend);
+      }, 0);
       const totalVentas = items.reduce((s, e) => s + (e.valor || 0), 0);
       const ingCajaNequi = state.flujo.filter(f => f.mes === mes).reduce((s, f) => s + (f.ingOp || 0), 0);
 
@@ -9697,7 +9761,7 @@
 
     // ════════════════════════════════════════════════════════════════════
     // PDF REPORTING — Ejecutivo, plano, sin colores
-    // Tres reportes: Flujo de Caja | Entregas y Cobros | CXC Pagar
+    // Tres reportes: Flujo de Caja | Entregas y Cobros | CXP Pagar
     // ════════════════════════════════════════════════════════════════════
 
     // ── Shared PDF utilities ─────────────────────────────────────────────
@@ -9989,12 +10053,16 @@
       );
 
       // ── Cuadre summary ─────────────────────────────────────────────────
+      // v61: misma fórmula que renderEntregas — "cobrado" incluye contados implícitos
       const totalPendiente = items.reduce((s, e) => {
         const cobrado = (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0);
         return s + Math.max(0, (e.cxc ?? e.valor ?? 0) - cobrado);
       }, 0);
-      const totalCobrado = items.reduce((s, e) =>
-        s + (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0), 0);
+      const totalCobrado = items.reduce((s, e) => {
+        const cob = (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0);
+        const pend = Math.max(0, (e.cxc ?? e.valor ?? 0) - cob);
+        return s + Math.max(0, (e.valor || 0) - pend);
+      }, 0);
       const totalVentas = items.reduce((s, e) => s + (e.valor || 0), 0);
       const ingCajaNequi = state.flujo
         .filter(f => f.mes === mes)
@@ -10002,9 +10070,9 @@
 
       // Summary box — 4 cols
       const sumItems = [
-        { label: 'TOTAL VENTAS A CRÉDITO', val: totalVentas },
-        { label: 'TOTAL COBRADO', val: totalCobrado },
-        { label: 'CXC PENDIENTE', val: totalPendiente },
+        { label: 'TOTAL VENTAS DEL MES', val: totalVentas },
+        { label: 'COBROS DEL MES (PLANILLA)', val: totalCobrado },
+        { label: 'CARTERA PENDIENTE', val: totalPendiente },
         { label: 'INGRESOS OP. CAJA+NEQUI', val: ingCajaNequi },
       ];
       const bw = (pageW - 20) / 4;
