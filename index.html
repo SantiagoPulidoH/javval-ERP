@@ -1292,12 +1292,38 @@
         overflow-y: auto;
       }
 
-      /* Autocomplete list: position correctly */
+      /* Autocomplete list: mobile-friendly positioning
+         Usa absolute (hereda del padre .autocomplete-wrap que es relative)
+         para que se coloque correctamente bajo cada input.
+         Ancho máximo del viewport, altura reducida para no chocar con teclado. */
       .autocomplete-list {
+        position: absolute !important;
+        top: calc(100% + 4px) !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: auto !important;
+        max-height: 180px !important;
+        z-index: 9999;
+      }
+
+      /* Autocomplete dentro del modal de flujo (productos): mantiene position fixed */
+      #fl-compra-items .autocomplete-list {
         position: fixed !important;
         width: calc(100vw - 32px) !important;
         left: 16px !important;
-        z-index: 9999;
+        max-height: 180px !important;
+      }
+
+      /* Items del autocomplete: tocables y bien espaciados */
+      .autocomplete-item {
+        padding: 12px 14px !important;
+        min-height: 44px !important;
+        font-size: 13px !important;
+      }
+
+      /* En mobile, select nativo se ve mejor que datalist para vendedor */
+      .form-select, select.form-input {
+        font-size: 16px !important;  /* evita zoom automático iOS */
       }
 
       /* Inventario filter buttons: wrap */
@@ -2311,6 +2337,10 @@
       </div>
 
       <button id="login-btn" class="login-btn" onclick="doLogin()">Entrar</button>
+
+      <div style="text-align:center;margin-top:14px">
+        <button type="button" onclick="doForgotPassword()" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;text-decoration:underline;font-family:var(--mono)">¿Olvidaste tu contraseña?</button>
+      </div>
 
       <div class="login-footer">Acceso restringido · Distribuidora Javval</div>
     </div>
@@ -3373,17 +3403,15 @@
             <input type="text" class="form-input" id="v-cliente-input" placeholder="Escribe para buscar cliente..."
               oninput="acFilter('v-cliente-input','v-cliente-list','clientes')"
               onfocus="acFilter('v-cliente-input','v-cliente-list','clientes')"
-              onblur="setTimeout(()=>closeAc('v-cliente-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('v-cliente-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="v-cliente-list"></div>
             <input type="hidden" id="v-cliente-val">
           </div>
         </div>
         <div class="form-group"><label class="form-label">Vendedor</label>
-          <div style="display:flex;gap:8px">
-            <input type="text" class="form-input" id="v-vendedor" placeholder="Seleccionar o escribir..."
-              list="vendedores-list" autocomplete="off">
-            <datalist id="vendedores-list"></datalist>
-          </div>
+          <select class="form-select" id="v-vendedor">
+            <option value="">— Seleccionar —</option>
+          </select>
         </div>
         <div class="form-group"><label class="form-label">Condición de Venta</label>
           <select class="form-select" id="v-condicion">
@@ -3454,7 +3482,7 @@
             <input type="text" class="form-input" id="co-cliente-input" placeholder="Escribe para buscar..."
               oninput="acFilter('co-cliente-input','co-cliente-list','clientes')"
               onfocus="acFilter('co-cliente-input','co-cliente-list','clientes')"
-              onblur="setTimeout(()=>closeAc('co-cliente-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('co-cliente-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="co-cliente-list"></div>
             <input type="hidden" id="co-cliente-val">
           </div>
@@ -3554,7 +3582,7 @@
             <input type="text" class="form-input" id="p-unidad" placeholder="Ej: KG, LB, MILLAR..."
               oninput="acFilterSimple(this,'p-unidad-list',getUnidades())"
               onfocus="acFilterSimple(this,'p-unidad-list',getUnidades())"
-              onblur="setTimeout(()=>closeAc('p-unidad-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('p-unidad-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="p-unidad-list"></div>
           </div>
         </div>
@@ -3564,7 +3592,7 @@
             <input type="text" class="form-input" id="p-categoria" placeholder="Ej: GRANOS, PLASTICOS..."
               oninput="acFilterSimple(this,'p-cat-list',getCategorias())"
               onfocus="acFilterSimple(this,'p-cat-list',getCategorias())"
-              onblur="setTimeout(()=>closeAc('p-cat-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('p-cat-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="p-cat-list"></div>
           </div>
         </div>
@@ -3586,7 +3614,7 @@
             <input type="text" class="form-input" id="p-proveedor" placeholder="Buscar o crear proveedor..."
               oninput="acFilter('p-proveedor','p-prov-list','proveedores',true)"
               onfocus="acFilter('p-proveedor','p-prov-list','proveedores',true)"
-              onblur="setTimeout(()=>closeAc('p-prov-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('p-prov-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="p-prov-list"></div>
           </div>
         </div>
@@ -3679,7 +3707,7 @@
           <div class="autocomplete-wrap">
             <input type="text" class="form-input" id="aj-prod-input" placeholder="Buscar producto..."
               oninput="prodAcFilterAjuste(this)" onfocus="prodAcFilterAjuste(this)"
-              onblur="setTimeout(()=>closeAc('aj-prod-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('aj-prod-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="aj-prod-list"></div>
           </div>
         </div>
@@ -3746,7 +3774,7 @@
           <div class="autocomplete-wrap">
             <input type="text" class="form-input" id="fl-rubro-input" placeholder="Escribe o selecciona el rubro..."
               style="font-size:14px;font-weight:600" oninput="acRubros(this)" onfocus="acRubros(this)"
-              onblur="setTimeout(()=>closeAc('fl-rubro-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('fl-rubro-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="fl-rubro-list"></div>
           </div>
         </div>
@@ -3866,7 +3894,7 @@
             <input type="text" class="form-input" id="ent-cliente-input" placeholder="Buscar cliente..."
               oninput="acFilter('ent-cliente-input','ent-cliente-list','clientes')"
               onfocus="acFilter('ent-cliente-input','ent-cliente-list','clientes')"
-              onblur="setTimeout(()=>closeAc('ent-cliente-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('ent-cliente-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="ent-cliente-list"></div>
             <input type="hidden" id="ent-cliente-val">
           </div>
@@ -3929,7 +3957,7 @@
             <input type="text" class="form-input" id="cxp-nombre-input" placeholder="Buscar proveedor..."
               oninput="acFilter('cxp-nombre-input','cxp-nombre-list','proveedores',true)"
               onfocus="acFilter('cxp-nombre-input','cxp-nombre-list','proveedores',true)"
-              onblur="setTimeout(()=>closeAc('cxp-nombre-list'),180)" autocomplete="off">
+              onblur="setTimeout(()=>closeAc('cxp-nombre-list'),300)" autocomplete="off">
             <div class="autocomplete-list" id="cxp-nombre-list"></div>
           </div>
         </div>
@@ -4224,6 +4252,44 @@
       } catch (e) {
         console.error('Logout error:', e);
         alert('Error al cerrar sesión: ' + (e.message || e.code));
+      }
+    }
+
+    async function doForgotPassword() {
+      const emailEl = document.getElementById('login-email');
+      const errEl   = document.getElementById('login-error');
+      const email = (emailEl?.value || '').trim();
+
+      if (!email) {
+        errEl.textContent = 'Escribe tu correo arriba y vuelve a presionar "¿Olvidaste tu contraseña?"';
+        errEl.classList.add('show');
+        errEl.style.background = 'rgba(59,130,246,0.1)';
+        errEl.style.borderColor = 'var(--blue)';
+        errEl.style.color = 'var(--blue)';
+        emailEl?.focus();
+        return;
+      }
+
+      if (!confirm(`Te enviaremos un email a ${email} con un enlace para restablecer tu contraseña. ¿Continuar?`)) return;
+
+      try {
+        await firebase.auth().sendPasswordResetEmail(email);
+        errEl.textContent = '✓ Revisa tu correo. Te enviamos un enlace para restablecer tu contraseña. Si no lo ves, revisa spam.';
+        errEl.classList.add('show');
+        errEl.style.background = 'rgba(34,197,94,0.1)';
+        errEl.style.borderColor = 'var(--green)';
+        errEl.style.color = 'var(--green)';
+      } catch (e) {
+        const map = {
+          'auth/invalid-email':  'Correo inválido.',
+          'auth/user-not-found': 'No hay un usuario registrado con ese correo.',
+          'auth/network-request-failed': 'Sin conexión a internet.'
+        };
+        errEl.textContent = map[e.code] || ('Error: ' + (e.message || e.code));
+        errEl.classList.add('show');
+        errEl.style.background = 'rgba(239,68,68,0.1)';
+        errEl.style.borderColor = 'var(--red)';
+        errEl.style.color = 'var(--red)';
       }
     }
 
@@ -5348,13 +5414,13 @@
       const filtered = val.length < 1 ? items.slice(0, 10) : items.filter(i => i.label.toUpperCase().includes(val)).slice(0, 10);
 
       let html = filtered.map(i =>
-        `<div class="autocomplete-item" onmousedown="selectAc('${inputId}','${listId}','${i.label.replace(/'/g, "\\'")}')">
+        `<div class="autocomplete-item" ontouchstart="event.preventDefault();" onmousedown="selectAc('${inputId}','${listId}','${i.label.replace(/'/g, "\\'")}')">
       <span>${i.label}</span><small>${i.sub}</small>
     </div>`
       ).join('');
 
       if (allowNew && val.length > 1 && !filtered.find(i => i.label === val)) {
-        html += `<div class="autocomplete-item ac-new" onmousedown="createProveedorRapido('${inputId}','${val}')">+ Crear "${val}" como nuevo proveedor</div>`;
+        html += `<div class="autocomplete-item ac-new" ontouchstart="event.preventDefault();" onmousedown="createProveedorRapido('${inputId}','${val}')">+ Crear "${val}" como nuevo proveedor</div>`;
       }
 
       list.innerHTML = html;
@@ -5366,7 +5432,7 @@
       const list = document.getElementById(listId);
       const filtered = val.length < 1 ? items.slice(0, 8) : items.filter(i => i.toUpperCase().includes(val)).slice(0, 8);
       list.innerHTML = filtered.map(i =>
-        `<div class="autocomplete-item" onmousedown="selectAcSimple('${input.id}','${listId}','${i.replace(/'/g, "\\'")}')">
+        `<div class="autocomplete-item" ontouchstart="event.preventDefault();" onmousedown="selectAcSimple('${input.id}','${listId}','${i.replace(/'/g, "\\'")}')">
       <span>${i}</span>
     </div>`
       ).join('');
@@ -5410,14 +5476,14 @@
       const filtered = val.length < 1 ? state.productos.slice(0, 12) : state.productos.filter(p => p.nombre.toUpperCase().includes(val)).slice(0, 12);
 
       let html = filtered.map(p =>
-        `<div class="autocomplete-item" onmousedown="selectProd(${rowIdx},'${p.nombre.replace(/'/g, "\\'")}','${p.unidad.replace(/'/g, "\\'")}',${p.costo},${p.precio1},'${mode}')">
+        `<div class="autocomplete-item" ontouchstart="event.preventDefault();" onmousedown="selectProd(${rowIdx},'${p.nombre.replace(/'/g, "\\'")}','${p.unidad.replace(/'/g, "\\'")}',${p.costo},${p.precio1},'${mode}')">
       <span>${p.nombre} <span style="color:var(--accent);font-size:10px">[${p.unidad}]</span></span>
       <small>${p.precio1 > 0 ? fmt(p.precio1) : ''}</small>
     </div>`
       ).join('');
 
       if (val.length > 1 && !filtered.find(p => p.nombre.toUpperCase() === val)) {
-        html += `<div class="autocomplete-item ac-new" onmousedown="triggerNuevoProducto(${rowIdx},'${val}','${mode}')">⚠️ Crear "${val}" como nuevo producto</div>`;
+        html += `<div class="autocomplete-item ac-new" ontouchstart="event.preventDefault();" onmousedown="triggerNuevoProducto(${rowIdx},'${val}','${mode}')">⚠️ Crear "${val}" como nuevo producto</div>`;
       }
 
       list.innerHTML = html;
@@ -5548,7 +5614,7 @@
       div.innerHTML = `
     <div class="autocomplete-wrap">
       <input id="vi-nombre-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Buscar producto..." value="${data.nombre || ''}"
-        oninput="prodAcFilter(this,'vi-list-${i}',${i},'v')" onfocus="prodAcFilter(this,'vi-list-${i}',${i},'v')" onblur="setTimeout(()=>closeAc('vi-list-${i}'),180)" autocomplete="off">
+        oninput="prodAcFilter(this,'vi-list-${i}',${i},'v')" onfocus="prodAcFilter(this,'vi-list-${i}',${i},'v')" onblur="setTimeout(()=>closeAc('vi-list-${i}'),300)" autocomplete="off">
       <div class="autocomplete-list" id="vi-list-${i}"></div>
     </div>
     <input id="vi-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
@@ -5566,7 +5632,7 @@
       div.innerHTML = `
     <div class="autocomplete-wrap">
       <input id="ci-nombre-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Buscar producto..." value="${data.nombre || ''}"
-        oninput="prodAcFilter(this,'ci-list-${i}',${i},'c')" onfocus="prodAcFilter(this,'ci-list-${i}',${i},'c')" onblur="setTimeout(()=>closeAc('ci-list-${i}'),180)" autocomplete="off">
+        oninput="prodAcFilter(this,'ci-list-${i}',${i},'c')" onfocus="prodAcFilter(this,'ci-list-${i}',${i},'c')" onblur="setTimeout(()=>closeAc('ci-list-${i}'),300)" autocomplete="off">
       <div class="autocomplete-list" id="ci-list-${i}"></div>
     </div>
     <input id="ci-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
@@ -6589,7 +6655,42 @@
       const tv = vm.reduce((s, v) => s + (v.total || 0), 0);
       const tc = cm.reduce((s, c) => s + (c.total || 0), 0);
       const tcob = cobm.reduce((s, c) => s + (c.valor || 0), 0);
-      const margen = tv - tc;
+
+      // ═══════════════════════════════════════════════════════════════
+      // MARGEN BRUTO (Opción A): Ventas − Costo real de productos vendidos
+      // Usa el precio de compra (costo) del catálogo de productos.
+      // Solo cuenta líneas con costo > 0 (productos con costo confirmado).
+      // Si hay líneas sin costo, se reportan aparte para transparencia.
+      // ═══════════════════════════════════════════════════════════════
+      const _prodCostoMap = {};
+      (state.productos || []).forEach(p => {
+        const key = (p.nombre || '').toUpperCase().trim() + '||' + (p.unidad || '').toUpperCase().trim();
+        _prodCostoMap[key] = parseFloat(p.costo) || 0;
+      });
+
+      let costoTotal = 0;
+      let ventasConCosto = 0;
+      let ventasSinCosto = 0;
+      let lineasSinCosto = 0;
+      let lineasConCosto = 0;
+      vm.forEach(v => {
+        (v.items || []).forEach(it => {
+          const key = (it.nombre || '').toUpperCase().trim() + '||' + (it.unidad || '').toUpperCase().trim();
+          const costoUnit = _prodCostoMap[key] || 0;
+          const cant = parseFloat(it.cant) || 0;
+          const subtotal = (parseFloat(it.precio) || 0) * cant;
+          if (costoUnit > 0) {
+            costoTotal += costoUnit * cant;
+            ventasConCosto += subtotal;
+            lineasConCosto++;
+          } else {
+            ventasSinCosto += subtotal;
+            lineasSinCosto++;
+          }
+        });
+      });
+      // Margen solo sobre ventas con costo confirmado (honesto, no inventa números)
+      const margen = ventasConCosto - costoTotal;
       const cartera = state.ventas.filter(v => v.condicion === 'Crédito').reduce((s, v) => s + (v.total || 0), 0)
         - state.cobros.reduce((s, c) => s + (c.valor || 0), 0);
       const deudaProv = state.cxpagar.reduce((s, x) => s + (x.saldo || 0), 0);
@@ -6641,8 +6742,17 @@
       document.getElementById('kpi-cobros-n').textContent = `${cobm.length} cobros`;
       document.getElementById('kpi-cartera').textContent = fmt(Math.max(0, cartera));
       document.getElementById('kpi-margen').textContent = fmt(margen);
-      const pct = tv > 0 ? ((margen / tv) * 100).toFixed(1) : '0';
-      document.getElementById('kpi-margen-pct').textContent = `${pct}% del total vendido`;
+      const pct = ventasConCosto > 0 ? ((margen / ventasConCosto) * 100).toFixed(1) : '0';
+      const lineasTotal = lineasConCosto + lineasSinCosto;
+      let margenSub;
+      if (lineasTotal === 0) {
+        margenSub = 'Sin ventas en el período';
+      } else if (lineasSinCosto === 0) {
+        margenSub = `${pct}% · ${lineasConCosto} líneas c/costo`;
+      } else {
+        margenSub = `${pct}% · ${lineasSinCosto}/${lineasTotal} líneas sin costo`;
+      }
+      document.getElementById('kpi-margen-pct').textContent = margenSub;
       document.getElementById('kpi-deuda-prov').textContent = fmt(deudaProv);
 
       // ── Top 10 Clientes ──────────────────────────────────────────────
@@ -6866,7 +6976,7 @@
       // Update cuadre summary
       const totalPend = items.reduce((s, e) => {
         const cob = (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0);
-        return s + Math.max(0, (e.cxc || e.valor || 0) - cob);
+        return s + Math.max(0, (e.cxc ?? e.valor ?? 0) - cob);
       }, 0);
       const totalCob = items.reduce((s, e) => s + (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0), 0);
       const totalVentas = items.reduce((s, e) => s + (e.valor || 0), 0);
@@ -6907,7 +7017,7 @@
         const cobMap = {};
         cobros.forEach(c => { cobMap[c.dia] = (cobMap[c.dia] || 0) + c.valor; });
         const totalCobE = cobros.reduce((s, c) => s + c.valor, 0);
-        const pendiente = Math.max(0, (e.cxc || e.valor || 0) - totalCobE);
+        const pendiente = Math.max(0, (e.cxc ?? e.valor ?? 0) - totalCobE);
         const estado = pendiente <= 0 ? 'green' : totalCobE > 0 ? 'orange' : 'red';
         let dayCells = '';
         for (let d = 1; d <= daysInMonth; d++) {
@@ -7003,7 +7113,7 @@
       const e = state.entregas.find(x => x.id === entId);
       if (!e) return;
       const cobrado = (e.cobros || []).reduce((s, c) => s + c.valor, 0);
-      const pendiente = Math.max(0, (e.cxc || e.valor || 0) - cobrado);
+      const pendiente = Math.max(0, (e.cxc ?? e.valor ?? 0) - cobrado);
       const infoEl = document.getElementById('cobro-cxc-info');
       if (infoEl) infoEl.textContent = `${e.cliente} — Rem. #${e.remision} — Pendiente: ${fmt(pendiente)}`;
       document.getElementById('ccxc-dia').value = dia;
@@ -7284,9 +7394,12 @@
     }
 
     function updateVendedoresDatalist() {
-      const dl = document.getElementById('vendedores-list');
-      if (!dl) return;
-      dl.innerHTML = (state.vendedores || []).map(v => `<option value="${v}">`).join('');
+      const sel = document.getElementById('v-vendedor');
+      if (!sel) return;
+      const current = sel.value;  // preservar selección si existe
+      sel.innerHTML = '<option value="">— Seleccionar —</option>' +
+        (state.vendedores || []).map(v => `<option value="${v}">${v}</option>`).join('');
+      if (current) sel.value = current;
     }
 
     function openVendedorSetupModal() {
@@ -7814,7 +7927,7 @@
       let html = filtered.map(p => {
         const safe = p.nombre.replace(/'/g, "\'");
         const safeU = p.unidad.replace(/'/g, "\'");
-        return `<div class="autocomplete-item" onmousedown="selectFCIProd(${rowIdx},'${safe}','${safeU}',${p.costo || 0})">
+        return `<div class="autocomplete-item" ontouchstart="event.preventDefault();" onmousedown="selectFCIProd(${rowIdx},'${safe}','${safeU}',${p.costo || 0})">
       <span>${p.nombre} <span style="color:var(--accent);font-size:10px">[${p.unidad}]</span></span>
       <small style="color:var(--text3)">${p.costo > 0 ? fmt(p.costo) : ''}</small>
     </div>`;
@@ -7822,7 +7935,7 @@
 
       if (val.length > 1 && !filtered.find(p => p.nombre.toUpperCase() === val)) {
         const safeV = val.replace(/'/g, "\'");
-        html += `<div class="autocomplete-item ac-new" onmousedown="triggerNuevoProducto(${rowIdx},'${safeV}','fc')">⚠️ Crear "${val}" como nuevo producto</div>`;
+        html += `<div class="autocomplete-item ac-new" ontouchstart="event.preventDefault();" onmousedown="triggerNuevoProducto(${rowIdx},'${safeV}','fc')">⚠️ Crear "${val}" como nuevo producto</div>`;
       }
       list.innerHTML = html;
       list.classList.toggle('open', filtered.length > 0 || val.length > 1);
@@ -8144,7 +8257,7 @@
         ? state.productos.slice(0, 12)
         : state.productos.filter(p => p.nombre.toUpperCase().includes(val)).slice(0, 12);
       list.innerHTML = filtered.map(p =>
-        `<div class="autocomplete-item" onmousedown="selectAjusteProd('${p.nombre.replace(/'/g, "\'")}','${p.unidad.replace(/'/g, "\'")}')">
+        `<div class="autocomplete-item" ontouchstart="event.preventDefault();" onmousedown="selectAjusteProd('${p.nombre.replace(/'/g, "\'")}','${p.unidad.replace(/'/g, "\'")}')">
       <span>${p.nombre} <span style="color:var(--accent);font-size:10px">[${p.unidad}]</span></span>
     </div>`
       ).join('');
@@ -8668,21 +8781,21 @@
           html += `<div style="padding:5px 12px 3px;font-size:10px;font-weight:700;color:${colColors[col]};text-transform:uppercase;letter-spacing:.8px;background:var(--surface);border-top:1px solid var(--border)">${colLabels[col]}</div>`;
           group.forEach(x => {
             const safe = x.r.replace(/'/g, "\\'");
-            html += `<div class="autocomplete-item" onmousedown="selectRubroFlujo('${safe}','${x.col}')"><span>${x.r}</span></div>`;
+            html += `<div class="autocomplete-item" ontouchstart="event.preventDefault();" onmousedown="selectRubroFlujo('${safe}','${x.col}')"><span>${x.r}</span></div>`;
           });
         });
       } else {
         // FLAT FILTERED LIST with col badge
         filtered.forEach(x => {
           const safe = x.r.replace(/'/g, "\\'");
-          html += `<div class="autocomplete-item" onmousedown="selectRubroFlujo('${safe}','${x.col}')">
+          html += `<div class="autocomplete-item" ontouchstart="event.preventDefault();" onmousedown="selectRubroFlujo('${safe}','${x.col}')">
         <span>${x.r}</span>
         <small style="color:${colColors[x.col] || 'var(--text3)'}">${colLabels[x.col] || x.col}</small>
       </div>`;
         });
         if (!filtered.find(x => x.r.toUpperCase() === val)) {
           const safeVal = val.replace(/'/g, "\\'");
-          html += `<div class="autocomplete-item ac-new" onmousedown="quickCreateRubro('${safeVal}')">+ Crear rubro "${val}"</div>`;
+          html += `<div class="autocomplete-item ac-new" ontouchstart="event.preventDefault();" onmousedown="quickCreateRubro('${safeVal}')">+ Crear rubro "${val}"</div>`;
         }
       }
 
@@ -8721,7 +8834,7 @@
             value="${data.nombre || ''}"
             oninput="prodAcFilter(this,'fci-list-${i}',${i},'fc')"
             onfocus="prodAcFilter(this,'fci-list-${i}',${i},'fc')"
-            onblur="setTimeout(()=>closeAc('fci-list-${i}'),180)" autocomplete="off">
+            onblur="setTimeout(()=>closeAc('fci-list-${i}'),300)" autocomplete="off">
           <div class="autocomplete-list" id="fci-list-${i}"></div>
         </div>
         <input id="fci-unidad-${i}" class="form-input" style="font-size:12px;padding:7px 10px" placeholder="Unidad" value="${data.unidad || ''}" readonly>
@@ -8966,6 +9079,7 @@
 
       // Collect compra items first (needed before validation)
       const compraItems = [];
+      const _productosActualizados = [];   // v59: batch sync a Firebase después
       document.querySelectorAll('[id^="fci-row-"]').forEach(row => {
         const idx = row.id.split('-').pop();
         const nombre = document.getElementById(`fci-nombre-${idx}`)?.value?.trim();
@@ -8975,16 +9089,26 @@
         const precio = parseFloat(document.getElementById(`fci-precio-${idx}`)?.value) || 0;
         if (nombre && cant > 0) {
           compraItems.push({ nombre, unidad, cant, precio, subtotal: Math.round(cant * precio) });
-          // Update product cost
+          // Update product cost — actualizar catálogo de productos con el nuevo precio de compra
           const pidx = state.productos.findIndex(p =>
             p.nombre.toUpperCase() === nombre.toUpperCase() && p.unidad === unidad);
           if (pidx >= 0 && precio > 0) {
-            state.productos[pidx].costo = precio;
-            state.productos[pidx].ultAct = today();
-            saveLocal();
+            const costoAnterior = state.productos[pidx].costo || 0;
+            // Solo actualizar si el precio cambió (evita writes innecesarios a Firebase)
+            if (Math.abs(costoAnterior - precio) > 0.01) {
+              state.productos[pidx].costo = precio;
+              state.productos[pidx].ultAct = today();
+              _productosActualizados.push(state.productos[pidx]);
+            }
           }
         }
       });
+      // Batch sync de productos actualizados a Firebase (para que el dashboard
+      // de margen bruto se recalcule cross-browser y todos vean el costo nuevo)
+      if (_productosActualizados.length > 0) {
+        saveLocal();
+        _productosActualizados.forEach(p => fsSaveMaster('productos', p, 'nombre'));
+      }
 
       // For compras with items: abono can be 0 (todo a crédito) — no block needed
       // For everything else: require a value
@@ -9740,7 +9864,7 @@
       // ── Cuadre summary ─────────────────────────────────────────────────
       const totalPendiente = items.reduce((s, e) => {
         const cobrado = (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0);
-        return s + Math.max(0, (e.cxc || e.valor || 0) - cobrado);
+        return s + Math.max(0, (e.cxc ?? e.valor ?? 0) - cobrado);
       }, 0);
       const totalCobrado = items.reduce((s, e) =>
         s + (e.cobros || []).reduce((cs, c) => cs + (c.valor || 0), 0), 0);
@@ -9796,7 +9920,7 @@
 
       const tableRows = items.map(e => {
         const cobrado = (e.cobros || []).reduce((s, c) => s + (c.valor || 0), 0);
-        const pendiente = Math.max(0, (e.cxc || e.valor || 0) - cobrado);
+        const pendiente = Math.max(0, (e.cxc ?? e.valor ?? 0) - cobrado);
         const estado = pendiente <= 0 ? 'PAGADO' : cobrado > 0 ? 'PARCIAL' : 'PENDIENTE';
         const detalleC = (e.cobros || []).map(c => `Día ${c.dia}: ${pdfFmt(c.valor)}`).join(' | ');
         const dias = e.fecha
@@ -9807,7 +9931,7 @@
           cliente: e.cliente || '',
           remision: e.remision ? '#' + e.remision : '',
           valor: pdfFmtFull(e.valor),
-          cxc: pdfFmtFull(e.cxc || e.valor),
+          cxc: pdfFmtFull(e.cxc ?? e.valor),
           cobrado: cobrado > 0 ? pdfFmtFull(cobrado) : '',
           pendiente: pendiente > 0 ? pdfFmtFull(pendiente) : '—',
           dias: String(dias),
@@ -9820,7 +9944,7 @@
       tableRows.push({
         fecha: '', cliente: 'TOTALES', remision: '',
         valor: pdfFmtFull(totalVentas),
-        cxc: pdfFmtFull(items.reduce((s, e) => s + (e.cxc || e.valor || 0), 0)),
+        cxc: pdfFmtFull(items.reduce((s, e) => s + (e.cxc ?? e.valor ?? 0), 0)),
         cobrado: pdfFmtFull(totalCobrado),
         pendiente: pdfFmtFull(totalPendiente),
         dias: '', estado: '', detalleC: '',
