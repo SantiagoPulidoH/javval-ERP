@@ -2819,6 +2819,11 @@
         <section id="sec-productos" class="section">
           <h1 class="section-title">Catálogo de Productos</h1>
           <p class="section-sub">Maestro de productos — <span id="productos-count">0</span> registrados</p>
+
+          <!-- v63: Recordatorio permanente hasta que renombren P1/P2/P3/P4 con nombres reales -->
+          <div style="background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--red);line-height:1.5">
+            ⚠ <strong>Pendiente:</strong> Definan qué representa cada nivel de precio (Precio 1, 2, 3, 4) — ej. público, regular, mayorista, especial. Mientras no estén nombrados, Valentina y Javier deben elegirlos por instinto cuando registren ventas, lo que aumenta el riesgo de facturar con precio incorrecto.
+          </div>
           <div class="toolbar">
             <input type="text" class="search-box" placeholder="Buscar producto por nombre o proveedor..."
               oninput="filterProductos(this.value)" id="prod-search">
@@ -3639,6 +3644,15 @@
           <select class="form-select" id="cl-credito">
             <option value="No">No</option>
             <option value="Sí">Sí</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nivel de Precio Default</label>
+          <select class="form-select" id="cl-nivel-precio" title="Cuando se registre una venta a este cliente, el precio se autorrellena con este nivel">
+            <option value="precio1">Precio 1</option>
+            <option value="precio2">Precio 2</option>
+            <option value="precio3">Precio 3</option>
+            <option value="precio4">Precio 4</option>
           </select>
         </div>
         <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea"
@@ -5702,8 +5716,121 @@
         }
       }
 
-      if (pEl) pEl.value = mode === 'v' ? Math.round(precio1) : Math.round(costo);
+      // ═══════════════════════════════════════════════════════════════
+      // v63: Selección inteligente de precio para ventas
+      //   - Si modo compra → usa costo (sin cambio).
+      //   - Si modo venta → busca el nivel de precio default del cliente seleccionado.
+      //     Si el cliente tiene nivelPrecio (ej. 'precio2'), usa ese.
+      //     Si no hay cliente o el cliente no tiene nivel, usa precio1 (default).
+      // ═══════════════════════════════════════════════════════════════
+      let precioElegido = precio1;
+      if (mode === 'v') {
+        // Buscar producto completo para acceder a P1-P4
+        const prod = state.productos.find(p =>
+          p.nombre.toUpperCase() === nombre.toUpperCase() && p.unidad === unidad);
+        if (prod) {
+          // Buscar cliente seleccionado en el modal
+          const cliVal = document.getElementById('v-cliente-val');
+          const cliNombre = cliVal?.value;
+          const cliente = cliNombre ? state.clientes.find(c => c.nombre === cliNombre) : null;
+          const nivelDefault = cliente?.nivelPrecio || 'precio1';
+          // Tomar el precio del nivel default si existe y > 0; si no, fallback a precio1
+          const candidato = parseFloat(prod[nivelDefault]) || 0;
+          precioElegido = candidato > 0 ? candidato : (parseFloat(prod.precio1) || precio1);
+        }
+      }
+
+      if (pEl) pEl.value = mode === 'v' ? Math.round(precioElegido) : Math.round(costo);
       calcItemTotal(rowIdx, mode);
+
+      // En modo venta, mostrar popover con los 4 precios para override manual
+      if (mode === 'v') showPrecioPicker(rowIdx, nombre, unidad);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // v63: Popover con los 4 precios disponibles del producto.
+    // Se muestra debajo del input de precio cuando se elige un producto en venta.
+    // Click en cualquier nivel cambia el precio de la fila al instante.
+    // ═══════════════════════════════════════════════════════════════
+    function showPrecioPicker(rowIdx, nombre, unidad) {
+      // Limpiar cualquier picker previo
+      document.querySelectorAll('.precio-picker').forEach(el => el.remove());
+
+      const prod = state.productos.find(p =>
+        p.nombre.toUpperCase() === nombre.toUpperCase() && p.unidad === unidad);
+      if (!prod) return;
+
+      const niveles = [
+        { key: 'precio1', label: 'P1', val: parseFloat(prod.precio1) || 0 },
+        { key: 'precio2', label: 'P2', val: parseFloat(prod.precio2) || 0 },
+        { key: 'precio3', label: 'P3', val: parseFloat(prod.precio3) || 0 },
+        { key: 'precio4', label: 'P4', val: parseFloat(prod.precio4) || 0 },
+      ].filter(n => n.val > 0);
+
+      // Si solo hay 1 precio (o ninguno), no mostramos el picker — no hay decisión que tomar
+      if (niveles.length <= 1) return;
+
+      const pEl = document.getElementById(`vi-precio-${rowIdx}`);
+      if (!pEl) return;
+
+      // Identificar nivel seleccionado actualmente
+      const cliVal = document.getElementById('v-cliente-val');
+      const cliNombre = cliVal?.value;
+      const cliente = cliNombre ? state.clientes.find(c => c.nombre === cliNombre) : null;
+      const nivelActivo = cliente?.nivelPrecio || 'precio1';
+
+      // Crear el picker como overlay flotante
+      const rect = pEl.getBoundingClientRect();
+      const picker = document.createElement('div');
+      picker.className = 'precio-picker';
+      picker.style.cssText = `
+        position: fixed;
+        top: ${rect.bottom + 4}px;
+        left: ${rect.left}px;
+        background: var(--surface);
+        border: 1px solid var(--accent);
+        border-radius: var(--radius);
+        padding: 6px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        z-index: 99999;
+        display: flex;
+        gap: 4px;
+        font-size: 11px;
+      `;
+      picker.innerHTML = niveles.map(n => `
+        <button type="button" onclick="pickPrecio(${rowIdx},${n.val});event.stopPropagation()"
+          style="background:${n.key === nivelActivo ? 'var(--accent)' : 'var(--surface2)'};
+                 color:${n.key === nivelActivo ? '#000' : 'var(--text)'};
+                 border:1px solid var(--border);border-radius:6px;padding:6px 10px;
+                 cursor:pointer;font-family:var(--mono);font-size:11px;white-space:nowrap"
+          title="${n.key === nivelActivo ? 'Sugerido para este cliente' : 'Click para usar'}">
+          <strong>${n.label}</strong> ${fmt(n.val)}
+        </button>
+      `).join('') + `
+        <button type="button" onclick="document.querySelectorAll('.precio-picker').forEach(el=>el.remove());event.stopPropagation()"
+          style="background:transparent;color:var(--text3);border:none;cursor:pointer;padding:6px 8px;font-size:14px" title="Cerrar">×</button>
+      `;
+      document.body.appendChild(picker);
+
+      // Auto-cierre cuando se da click en otro lado
+      setTimeout(() => {
+        const closer = (ev) => {
+          if (!picker.contains(ev.target)) {
+            picker.remove();
+            document.removeEventListener('click', closer);
+          }
+        };
+        document.addEventListener('click', closer);
+      }, 100);
+    }
+
+    function pickPrecio(rowIdx, valor) {
+      const pEl = document.getElementById(`vi-precio-${rowIdx}`);
+      if (pEl) {
+        pEl.value = Math.round(valor);
+        calcItemTotal(rowIdx, 'v');
+      }
+      document.querySelectorAll('.precio-picker').forEach(el => el.remove());
     }
 
     function updatePrecioFromUnidad(rowIdx, nombre, mode) {
@@ -5712,7 +5839,21 @@
       const pEl = document.getElementById(`${pre}-precio-${rowIdx}`);
       const unidad = uEl?.value;
       const prod = state.productos.find(p => p.nombre.toUpperCase() === nombre.toUpperCase() && p.unidad === unidad);
-      if (prod && pEl) pEl.value = Math.round(mode === 'v' ? prod.precio1 : prod.costo);
+      if (!prod || !pEl) return;
+
+      if (mode === 'v') {
+        // v63: respetar nivel de precio del cliente al cambiar unidad
+        const cliVal = document.getElementById('v-cliente-val');
+        const cliNombre = cliVal?.value;
+        const cliente = cliNombre ? state.clientes.find(c => c.nombre === cliNombre) : null;
+        const nivel = cliente?.nivelPrecio || 'precio1';
+        const candidato = parseFloat(prod[nivel]) || 0;
+        pEl.value = Math.round(candidato > 0 ? candidato : (parseFloat(prod.precio1) || 0));
+        // Reabrir picker para que pueda cambiar precio si quiere
+        showPrecioPicker(rowIdx, nombre, unidad);
+      } else {
+        pEl.value = Math.round(prod.costo);
+      }
       calcItemTotal(rowIdx, mode);
     }
 
@@ -6256,11 +6397,14 @@
         document.getElementById('cl-categoria').value = c.categoria || '';
         document.getElementById('cl-vendedor').value = c.vendedor || '';
         document.getElementById('cl-credito').value = c.credito === 'Si' || c.credito === 'Sí' ? 'Sí' : 'No';
+        document.getElementById('cl-nivel-precio').value = c.nivelPrecio || 'precio1';
         document.getElementById('cl-notas').value = c.notas || '';
         document.getElementById('cl-idx').value = idx;
       } else {
         ['cl-nombre', 'cl-telefono', 'cl-nit', 'cl-direccion', 'cl-barrio', 'cl-vendedor', 'cl-notas'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('cl-categoria').value = ''; document.getElementById('cl-credito').value = 'No';
+        document.getElementById('cl-categoria').value = '';
+        document.getElementById('cl-credito').value = 'No';
+        document.getElementById('cl-nivel-precio').value = 'precio1';
         document.getElementById('cl-idx').value = '';
       }
       document.getElementById('modal-cliente').classList.add('open');
@@ -6273,9 +6417,15 @@
         nombre, telefono: document.getElementById('cl-telefono').value, nit: document.getElementById('cl-nit').value,
         direccion: document.getElementById('cl-direccion').value, barrio: document.getElementById('cl-barrio').value,
         categoria: document.getElementById('cl-categoria').value, vendedor: document.getElementById('cl-vendedor').value,
-        credito: document.getElementById('cl-credito').value, notas: document.getElementById('cl-notas').value, activo: 'Sí',
+        credito: document.getElementById('cl-credito').value,
+        nivelPrecio: document.getElementById('cl-nivel-precio').value || 'precio1',
+        notas: document.getElementById('cl-notas').value, activo: 'Sí',
         id: editingId.cliente !== null ? state.clientes[editingId.cliente].id : state.clientes.length + 1
       };
+      // Preservar _fbId al editar (evita duplicados en Firebase)
+      if (editingId.cliente !== null && state.clientes[editingId.cliente]._fbId) {
+        c._fbId = state.clientes[editingId.cliente]._fbId;
+      }
       if (editingId.cliente !== null) state.clientes[editingId.cliente] = c; else state.clientes.unshift(c);
       saveLocal();
       fsSaveMaster('clientes', c, 'nombre');
@@ -6683,7 +6833,7 @@
     // ════════════════════════════════════════════
     function exportClientesExcel() {
       if (!state.clientes || state.clientes.length === 0) { toast('No hay clientes para exportar', 'error'); return; }
-      const headers = ['_fbId', 'id', 'nombre', 'categoria', 'telefono', 'barrio', 'direccion', 'vendedor', 'nit', 'credito', 'activo'];
+      const headers = ['_fbId', 'id', 'nombre', 'categoria', 'telefono', 'barrio', 'direccion', 'vendedor', 'nit', 'credito', 'nivelPrecio', 'activo'];
       const rows = state.clientes.map(c => [
         c._fbId || slugify(String(c.nombre || '')),
         c.id || '',
@@ -6695,12 +6845,13 @@
         c.vendedor || '',
         c.nit || '',
         c.credito || '',
+        c.nivelPrecio || 'precio1',
         c.activo || 'Sí'
       ]);
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       // Ancho de columnas
       ws['!cols'] = [
-        { wch: 30 }, { wch: 6 }, { wch: 40 }, { wch: 16 }, { wch: 16 }, { wch: 22 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 6 }
+        { wch: 30 }, { wch: 6 }, { wch: 40 }, { wch: 16 }, { wch: 16 }, { wch: 22 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 12 }, { wch: 6 }
       ];
       // Estilo cabecera (color azul oscuro)
       const range = XLSX.utils.decode_range(ws['!ref']);
@@ -6746,6 +6897,10 @@
               vendedor: String(row.vendedor || row.VENDEDOR || '').trim(),
               nit: String(row.nit || row.NIT || '').trim(),
               credito: String(row.credito || row.CREDITO || 'No').trim(),
+              nivelPrecio: (function () {
+                const v = String(row.nivelPrecio || row.NIVELPRECIO || row['Nivel Precio'] || '').trim().toLowerCase();
+                return ['precio1', 'precio2', 'precio3', 'precio4'].includes(v) ? v : 'precio1';
+              })(),
               activo: String(row.activo || row.ACTIVO || 'Sí').trim()
             };
             const existIdx = state.clientes.findIndex(c => (c._fbId && c._fbId === fbId) || c.nombre.toUpperCase() === nombre);
