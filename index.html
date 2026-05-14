@@ -2821,8 +2821,11 @@
           <p class="section-sub">Maestro de productos — <span id="productos-count">0</span> registrados</p>
 
           <!-- v63: Recordatorio permanente hasta que renombren P1/P2/P3/P4 con nombres reales -->
-          <div style="background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--red);line-height:1.5">
-            ⚠ <strong>Pendiente:</strong> Definan qué representa cada nivel de precio (Precio 1, 2, 3, 4) — ej. público, regular, mayorista, especial. Mientras no estén nombrados, Valentina y Javier deben elegirlos por instinto cuando registren ventas, lo que aumenta el riesgo de facturar con precio incorrecto.
+          <div
+            style="background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--red);line-height:1.5">
+            ⚠ <strong>Pendiente:</strong> Definan qué representa cada nivel de precio (Precio 1, 2, 3, 4) — ej. público,
+            regular, mayorista, especial. Mientras no estén nombrados, Valentina y Javier deben elegirlos por instinto
+            cuando registren ventas, lo que aumenta el riesgo de facturar con precio incorrecto.
           </div>
           <div class="toolbar">
             <input type="text" class="search-box" placeholder="Buscar producto por nombre o proveedor..."
@@ -3648,7 +3651,8 @@
         </div>
         <div class="form-group">
           <label class="form-label">Nivel de Precio Default</label>
-          <select class="form-select" id="cl-nivel-precio" title="Cuando se registre una venta a este cliente, el precio se autorrellena con este nivel">
+          <select class="form-select" id="cl-nivel-precio"
+            title="Cuando se registre una venta a este cliente, el precio se autorrellena con este nivel">
             <option value="precio1">Precio 1</option>
             <option value="precio2">Precio 2</option>
             <option value="precio3">Precio 3</option>
@@ -6090,11 +6094,17 @@
     function imprimirVenta(v) {
       const cli = state.clientes.find(c => c.nombre === v.cliente) || {};
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+      // ═══════════════════════════════════════════════════════════════
+      // v64: Tamaño media carta 220×140mm (papelería colombiana estándar).
+      // Reduje márgenes laterales (8mm) y reescalé offsets para aprovechar
+      // el ancho útil de 204mm sin sacrificar legibilidad.
+      // ═══════════════════════════════════════════════════════════════
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [220, 140] });
 
-      const W = 279, H = 216;
-      const ml = 18, mr = W - 18;
-      let y = 14;
+      const W = 220, H = 140;
+      const ml = 8, mr = W - 8;       // márgenes laterales reducidos
+      const mid = ml + (mr - ml) / 2; // punto medio del área útil
+      let y = 10;
 
       // ── Currency formatter — single clean string, no split $ ─────────
       function fmtCOP(n) {
@@ -6104,71 +6114,71 @@
 
       // ── TITLE
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
       doc.text('COMERCIALIZADORA JAVVAL', W / 2, y, { align: 'center' });
 
       // ── CONTACT INFO (below title)
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.text('324 766 0686  Contacto   |   324 766 0686  Nequi', W / 2, y + 5, { align: 'center' });
+      doc.setFontSize(7);
+      doc.text('324 766 0686  Contacto   |   324 766 0686  Nequi', W / 2, y + 4, { align: 'center' });
 
       // ── REMISIÓN box (top-right)
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text('REMISIÓN', mr - 42, y - 4);
-      doc.setFontSize(13);
-      doc.text(String(v.remision), mr, y - 4, { align: 'right' });
+      doc.text('REMISIÓN', mr - 32, y - 3);
+      doc.setFontSize(12);
+      doc.text(String(v.remision), mr, y - 3, { align: 'right' });
 
-      y += 6;
-      doc.setLineWidth(0.4);
+      y += 5;
+      doc.setLineWidth(0.3);
       doc.setDrawColor(0, 0, 0);
       doc.line(ml, y, mr, y);
-      y += 7;
+      y += 6;
 
       // ── Row 1: FECHA / VENDEDOR
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
       doc.text('FECHA', ml, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(v.fecha, ml + 18, y);
-      doc.line(ml + 16, y + 1, ml + 80, y + 1);
+      doc.text(v.fecha, ml + 15, y);
+      doc.line(ml + 13, y + 1, mid - 4, y + 1);
 
       doc.setFont('helvetica', 'bold');
-      doc.text('VENDEDOR', W / 2 + 10, y);
+      doc.text('VENDEDOR', mid + 4, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(v.vendedor || '', W / 2 + 32, y);
-      doc.line(W / 2 + 30, y + 1, mr, y + 1);
-      y += 7;
+      doc.text(v.vendedor || '', mid + 22, y);
+      doc.line(mid + 20, y + 1, mr, y + 1);
+      y += 6;
 
       // ── Row 2: CLIENTE / CEL
       doc.setFont('helvetica', 'bold');
       doc.text('CLIENTE', ml, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(v.cliente, ml + 18, y);
-      doc.line(ml + 16, y + 1, ml + 80, y + 1);
+      doc.text(String(v.cliente || '').slice(0, 38), ml + 15, y);
+      doc.line(ml + 13, y + 1, mid - 4, y + 1);
 
       doc.setFont('helvetica', 'bold');
-      doc.text('CEL', W / 2 + 10, y);
+      doc.text('CEL', mid + 4, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(cli.telefono || '', W / 2 + 20, y);
-      doc.line(W / 2 + 18, y + 1, mr, y + 1);
-      y += 7;
+      doc.text(cli.telefono || '', mid + 13, y);
+      doc.line(mid + 11, y + 1, mr, y + 1);
+      y += 6;
 
       // ── Row 3: DIRECCIÓN / PAGO
       doc.setFont('helvetica', 'bold');
       doc.text('DIRECCIÓN /\nBARRIO', ml, y);
       doc.setFont('helvetica', 'normal');
       const dirTxt = [cli.direccion, cli.barrio].filter(Boolean).join(' / ');
-      doc.text(dirTxt || '', ml + 22, y);
-      doc.line(ml + 20, y + 1, ml + 80, y + 1);
+      doc.text(String(dirTxt).slice(0, 42), ml + 18, y);
+      doc.line(ml + 16, y + 1, mid - 4, y + 1);
 
       doc.setFont('helvetica', 'bold');
-      doc.text('PAGO', W / 2 + 10, y);
+      doc.text('PAGO', mid + 4, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(v.condicion || '', W / 2 + 22, y);
-      doc.line(W / 2 + 20, y + 1, mr, y + 1);
-      y += 7;
+      doc.text(v.condicion || '', mid + 14, y);
+      doc.line(mid + 12, y + 1, mr, y + 1);
+      y += 6;
 
       // ── OBSERVACIÓN (only render if present)
       if (v.obs && v.obs.trim()) {
@@ -6176,27 +6186,26 @@
         doc.text('OBSERVACIÓN', ml, y);
         doc.setFont('helvetica', 'normal');
         // truncate visually long obs to fit one line
-        const obsTxt = String(v.obs).slice(0, 130);
-        doc.text(obsTxt, ml + 28, y);
-        doc.line(ml + 26, y + 1, mr, y + 1);
-        y += 7;
+        const obsTxt = String(v.obs).slice(0, 110);
+        doc.text(obsTxt, ml + 23, y);
+        doc.line(ml + 21, y + 1, mr, y + 1);
+        y += 6;
       }
-      y += 3;
+      y += 2;
 
       // ── TABLE HEADER
-      // vunit right edge at mr-16, vtotal right edge at mr
       const cols = {
         cant: ml,
-        empaque: ml + 22,
-        producto: ml + 52,
-        vunit: mr - 65,   // right-aligned anchor for unit price
-        vtotal: mr,      // right-aligned anchor for line total
+        empaque: ml + 18,
+        producto: ml + 42,
+        vunit: mr - 50,    // right-aligned anchor for unit price
+        vtotal: mr,        // right-aligned anchor for line total
       };
 
       doc.setFillColor(240, 240, 240);
-      doc.rect(ml, y - 4, mr - ml, 7, 'F');
+      doc.rect(ml, y - 3.5, mr - ml, 6, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
+      doc.setFontSize(7.5);
       doc.text('CANTIDAD', cols.cant, y);
       doc.text('EMPAQUE', cols.empaque, y);
       doc.text('PRODUCTO', cols.producto, y);
@@ -6204,59 +6213,58 @@
       doc.text('VALOR TOTAL', cols.vtotal, y, { align: 'right' });
       y += 1;
       doc.line(ml, y, mr, y);
-      y += 5;
+      y += 4.5;
 
       // ── TABLE ROWS
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(7.5);
       v.items.forEach(item => {
         doc.text(fmtCant(item.cant), cols.cant, y);
-        doc.text(item.unidad || '', cols.empaque, y);
-        doc.text(item.nombre || '', cols.producto, y);
-        // Single right-aligned string — no split $ 
+        doc.text(String(item.unidad || '').slice(0, 12), cols.empaque, y);
+        doc.text(String(item.nombre || '').slice(0, 36), cols.producto, y);
         doc.text(fmtCOP(item.precio), cols.vunit, y, { align: 'right' });
         doc.text(fmtCOP(item.subtotal), cols.vtotal, y, { align: 'right' });
-        y += 6.5;
+        y += 5.5;
       });
 
       // Fill remaining rows to bottom line
-      const tableEnd = y < H - 48 ? H - 48 : y;
+      const tableEnd = y < H - 38 ? H - 38 : y;
       y = tableEnd;
       doc.line(ml, y, mr, y);
-      y += 6;
+      y += 5;
 
       // ── TOTALS (right side) — all right-aligned, no split $
-      const labelX = mr - 58;  // left edge of label text
-      const valueX = mr;     // right edge of value text (right-aligned)
+      const labelX = mr - 48;
+      const valueX = mr;
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(8);
 
       doc.text('SUB TOTAL', labelX, y);
       doc.text(fmtCOP(v.subtotal || v.total), valueX, y, { align: 'right' });
-      y += 6;
+      y += 5;
 
       doc.text('DESCUENTO', labelX, y);
       doc.text(fmtCOP(v.descuento || 0), valueX, y, { align: 'right' });
-      y += 6;
+      y += 5;
 
       doc.text('DOMICILIO', labelX, y);
       doc.text(fmtCOP(v.domicilio || 0), valueX, y, { align: 'right' });
       y += 1;
 
       doc.line(labelX - 2, y, valueX + 2, y);
-      y += 5;
+      y += 4;
 
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.text('TOTAL', labelX, y);
       doc.text(fmtCOP(v.total), valueX, y, { align: 'right' });
 
       // ── FIRMA (left)
-      const firmY = H - 20;
+      const firmY = H - 14;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.text('FIRMA', ml, firmY);
-      doc.line(ml + 12, firmY + 1, ml + 80, firmY + 1);
+      doc.line(ml + 10, firmY + 1, ml + 70, firmY + 1);
 
       doc.save(`Remision_${v.remision}_${v.cliente.replace(/\s/g, '_')}.pdf`);
       toast('PDF generado ✓', 'success');
